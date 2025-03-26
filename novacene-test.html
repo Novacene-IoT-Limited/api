@@ -2,155 +2,158 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Novacene Sensor Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📡 Novacene Viewer – Sensor Dashboard</title>
   <style>
-    body { font-family: sans-serif; padding: 1em; }
-    textarea { width: 100%; height: 200px; }
-    select, input { margin: 0.5em 0; width: 100%; }
-    .section-title { font-size: 1.3em; margin-top: 1em; font-weight: bold; }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    select, input, button, textarea { margin-top: 5px; width: 100%; padding: 6px; }
+    .section { margin-top: 30px; }
+    .inline { display: inline-block; width: auto; margin-right: 10px; }
   </style>
 </head>
 <body>
+  <h2>📡 Novacene Viewer – Sensor Dashboard</h2>
 
-<h2>📱 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h2>
+  <div class="section">
+    <label>API Token:</label>
+    <input type="text" id="apiToken" placeholder="Enter your API token" />
+    <input type="checkbox" id="rememberKey" /> Remember API Token
+  </div>
 
-<label>API Token:</label><br/>
-<input type="text" id="apiToken" value="YOUR_DEFAULT_API_TOKEN_HERE"/><br/>
+  <div class="section">
+    <label>Project ID:</label>
+    <input type="text" id="projectId" placeholder="Enter Project ID (e.g. 471)" />
 
-<label>Project ID:</label><br/>
-<input type="text" id="projectId" value="YOUR_DEFAULT_PROJECT_ID_HERE"/><br/>
+    <label>Site:</label>
+    <select id="siteSelect"></select>
 
-<label>Site:</label><br/>
-<select id="siteSelect"></select><br/>
+    <label>Zone:</label>
+    <select id="zoneSelect"></select>
 
-<label>Zone:</label><br/>
-<select id="zoneSelect"></select><br/>
+    <button onclick="fetchDevicesAndSensors()">Fetch Devices & Sensors</button>
+  </div>
 
-<button onclick="fetchDevices()">Fetch Devices & Sensors</button>
+  <div id="deviceList" class="section"></div>
 
-<div class="section-title">📊 Available Sensors:</div>
-<label>Select Sensor:</label>
-<select id="sensorSelect"></select>
+  <div class="section">
+    <label>📊 Available Sensors:</label>
+    <select id="sensorSelect"></select>
 
-<label>Start Date:</label>
-<input type="datetime-local" id="startDate">
+    <label>Start Date:</label>
+    <input type="datetime-local" id="startDate" />
+    <label>End Date:</label>
+    <input type="datetime-local" id="endDate" />
 
-<label>End Date:</label>
-<input type="datetime-local" id="endDate">
+    <button onclick="fetchSensorData()">Fetch Sensor Data</button>
+  </div>
 
-<button onclick="fetchSensorData()">Fetch Sensor Data</button>
+  <div class="section">
+    <label>📈 Sensor Data Output:</label>
+    <textarea id="sensorDataOutput" rows="10"></textarea>
+  </div>
 
-<div class="section-title">📈 Sensor Data Output:</div>
-<textarea id="sensorOutput" readonly></textarea>
+  <script>
+    const apiBase = 'https://api.novacene.io';
 
-<script>
-let sensors = [];
-
-async function fetchSitesAndZones() {
-  const token = document.getElementById("apiToken").value;
-  const projectId = document.getElementById("projectId").value;
-  const siteRes = await fetch(`https://api.novacene.io/api/sites?projectid=${projectId}`, {
-    headers: { "api_token": token }
-  });
-  const siteData = await siteRes.json();
-
-  const siteSelect = document.getElementById("siteSelect");
-  siteSelect.innerHTML = "";
-  siteData.data.forEach(site => {
-    const opt = document.createElement("option");
-    opt.value = site.id;
-    opt.textContent = site.name;
-    siteSelect.appendChild(opt);
-  });
-
-  siteSelect.addEventListener("change", fetchZones);
-  fetchZones();
-}
-
-async function fetchZones() {
-  const token = document.getElementById("apiToken").value;
-  const siteId = document.getElementById("siteSelect").value;
-  const zoneRes = await fetch(`https://api.novacene.io/api/zones?siteid=${siteId}`, {
-    headers: { "api_token": token }
-  });
-  const zoneData = await zoneRes.json();
-
-  const zoneSelect = document.getElementById("zoneSelect");
-  zoneSelect.innerHTML = "";
-  zoneData.data.forEach(zone => {
-    const opt = document.createElement("option");
-    opt.value = zone.id;
-    opt.textContent = zone.name;
-    zoneSelect.appendChild(opt);
-  });
-}
-
-async function fetchDevices() {
-  const token = document.getElementById("apiToken").value;
-  const zoneId = document.getElementById("zoneSelect").value;
-  const url = `https://api.novacene.io/api/devices?zoneids=${zoneId}&limit=100&nodeveui=false&includeSensors=true&nocache=${Date.now()}`;
-  const res = await fetch(url, {
-    headers: { "api_token": token }
-  });
-  const data = await res.json();
-
-  sensors = [];
-  const select = document.getElementById("sensorSelect");
-  select.innerHTML = "";
-
-  data.data.forEach(device => {
-    device.sensors?.forEach(sensor => {
-      sensors.push(sensor);
-      const opt = document.createElement("option");
-      opt.value = sensor.token;
-      opt.textContent = `${device.name} – ${sensor.token}`;
-      select.appendChild(opt);
-    });
-  });
-}
-
-async function fetchSensorData() {
-  const token = document.getElementById("apiToken").value;
-  const sensorToken = document.getElementById("sensorSelect").value;
-  const startRaw = document.getElementById("startDate").value;
-  const endRaw = document.getElementById("endDate").value;
-  const output = document.getElementById("sensorOutput");
-
-  if (!sensorToken || !startRaw || !endRaw) {
-    alert("Please select a sensor and date range.");
-    return;
-  }
-
-  const start = startRaw + ":00Z";
-  const end = endRaw + ":00Z";
-  const url = `https://api.novacene.io/api/sensordata?token=${encodeURIComponent(sensorToken)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&limit=1000`;
-
-  try {
-    const res = await fetch(url, {
-      headers: { "api_token": token }
-    });
-    const data = await res.json();
-
-    if (!data.success) {
-      output.value = "❌ API Error:\n" + JSON.stringify(data, null, 2);
-      return;
+    window.onload = () => {
+      if (localStorage.getItem('apiToken')) {
+        document.getElementById('apiToken').value = localStorage.getItem('apiToken');
+        document.getElementById('rememberKey').checked = true;
+      }
     }
 
-    if (!data.data?.values?.length) {
-      output.value = "⚠️ No data found for that time range.";
-      return;
+    async function fetchSites() {
+      const token = document.getElementById('apiToken').value;
+      if (!token) return alert('API Token required');
+      const res = await fetch(`${apiBase}/site`, {
+        headers: { 'api_token': token }
+      });
+      const sites = await res.json();
+      const siteSelect = document.getElementById('siteSelect');
+      siteSelect.innerHTML = '';
+      sites.forEach(site => {
+        const opt = document.createElement('option');
+        opt.value = site.id;
+        opt.textContent = site.name;
+        siteSelect.appendChild(opt);
+      });
+      fetchZones();
     }
 
-    const rows = data.data.values.map(entry => `${entry.timestamp} → ${entry.value}`);
-    output.value = rows.join("\n");
-  } catch (err) {
-    output.value = "❌ Fetch error:\n" + err.message;
-  }
-}
+    async function fetchZones() {
+      const token = document.getElementById('apiToken').value;
+      const siteId = document.getElementById('siteSelect').value;
+      if (!token || !siteId) return;
+      const res = await fetch(`${apiBase}/zones?siteids=${siteId}`, {
+        headers: { 'api_token': token }
+      });
+      const zones = await res.json();
+      const zoneSelect = document.getElementById('zoneSelect');
+      zoneSelect.innerHTML = '';
+      zones.forEach(zone => {
+        const opt = document.createElement('option');
+        opt.value = zone.id;
+        opt.textContent = zone.name;
+        zoneSelect.appendChild(opt);
+      });
+    }
 
-// Trigger initial site/zone loading
-fetchSitesAndZones();
-</script>
+    async function fetchDevicesAndSensors() {
+      const token = document.getElementById('apiToken').value;
+      const zoneId = document.getElementById('zoneSelect').value;
+      if (!token || !zoneId) return;
 
+      if (document.getElementById('rememberKey').checked) {
+        localStorage.setItem('apiToken', token);
+      } else {
+        localStorage.removeItem('apiToken');
+      }
+
+      const res = await fetch(`${apiBase}/devices?zoneids=${zoneId}&limit=100&nodeveui=false&includeSensors=true&nocache=${Date.now()}`, {
+        headers: { 'api_token': token }
+      });
+      const devices = await res.json();
+      const outputDiv = document.getElementById('deviceList');
+      const sensorSelect = document.getElementById('sensorSelect');
+      outputDiv.innerHTML = '';
+      sensorSelect.innerHTML = '';
+
+      devices.forEach(device => {
+        const d = document.createElement('div');
+        d.innerHTML = `<strong>📟 ${device.name}</strong> (ID: ${device.id})`;
+        outputDiv.appendChild(d);
+        if (device.sensors) {
+          device.sensors.forEach(sensor => {
+            const s = document.createElement('div');
+            s.textContent = `🔹 ${sensor.token}: ${sensor.last_value} @ ${sensor.timestamp}`;
+            outputDiv.appendChild(s);
+            const opt = document.createElement('option');
+            opt.value = sensor.token;
+            opt.textContent = `${device.name} – ${sensor.token}`;
+            sensorSelect.appendChild(opt);
+          });
+        }
+      });
+    }
+
+    async function fetchSensorData() {
+      const token = document.getElementById('apiToken').value;
+      const sensorToken = document.getElementById('sensorSelect').value;
+      const start = new Date(document.getElementById('startDate').value).toISOString();
+      const end = new Date(document.getElementById('endDate').value).toISOString();
+      const output = document.getElementById('sensorDataOutput');
+      output.value = 'Loading...';
+
+      const res = await fetch(`${apiBase}/sensordata?sensor=${sensorToken}&start=${start}&end=${end}`, {
+        headers: { 'api_token': token }
+      });
+      const data = await res.json();
+      output.value = JSON.stringify(data, null, 2);
+    }
+
+    document.getElementById('siteSelect').addEventListener('change', fetchZones);
+    document.getElementById('apiToken').addEventListener('change', fetchSites);
+  </script>
 </body>
 </html>
