@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Novacene API Viewer (Flat Device Dump)</title>
+  <title>Novacene API Viewer (POST /devices/fd)</title>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
     input { width: 80%; margin-bottom: 10px; }
@@ -11,7 +11,7 @@
   </style>
 </head>
 <body>
-  <h1>Novacene API Viewer (Flat Device Dump from Project 145)</h1>
+  <h1>Novacene API Viewer (Using POST /devices/fd for project 145)</h1>
 
   <label><strong>API Token:</strong></label><br>
   <input type="text" id="apiToken" placeholder="Paste your API key here"><br>
@@ -50,22 +50,30 @@
       const token = document.getElementById('apiToken').value.trim();
       const start = document.getElementById('startDate').value;
       const end = document.getElementById('endDate').value;
-      const headers = { 'api_token': token };
+      const headers = {
+        'api_token': token,
+        'Content-Type': 'application/json'
+      };
       const output = document.getElementById('output');
-      output.textContent = "⏳ Fetching all devices for project 145...";
+      output.textContent = "⏳ Fetching devices using /devices/fd...";
 
       const projectId = 145;
       let outputText = `📦 Project ID: ${projectId}\n\n`;
+      const dateList = getDateList(start, end);
 
       try {
-        const dateList = getDateList(start, end);
-
-        // Get devices for the project
-        const devicesRes = await fetch(`https://api-prod.novacene.io/api/v2/devices?projectid=${projectId}`, { headers });
+        const devicesRes = await fetch(
+          `https://api-prod.novacene.io/api/v2/devices/fd`,
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ projectid: projectId })
+          }
+        );
         const devices = await devicesRes.json();
 
         if (!devices?.list?.length) {
-          outputText += `⚠️ No devices found for project ${projectId}\n`;
+          outputText += `⚠️ No devices found via /devices/fd\n`;
           output.textContent = outputText;
           return;
         }
@@ -73,8 +81,8 @@
         for (const d of devices.list) {
           outputText += `📡 Device: ${d.name || "Unnamed"}\n`;
           outputText += `  ID: ${d.id}\n`;
-          outputText += `  siteId: ${d.siteId || "❓ missing"}\n`;
-          outputText += `  zoneId: ${d.zoneId || "❓ missing"}\n`;
+          outputText += `  siteId: ${d.siteId || "❓"}\n`;
+          outputText += `  zoneId: ${d.zoneId || "❓"}\n`;
           outputText += `  deveui: ${d.deveui || "N/A"}\n`;
 
           const sensorIds = d.graphSettings?.sensorsOrder?.active || [];
@@ -94,7 +102,7 @@
               const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${siteId}&sensor=${sensorId}&start=${day}&end=${day}`;
 
               try {
-                const res = await fetch(url, { headers });
+                const res = await fetch(url, { headers: { 'api_token': token } });
                 const json = await res.json();
 
                 if (json?.list?.length) {
