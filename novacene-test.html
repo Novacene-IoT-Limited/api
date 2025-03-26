@@ -2,94 +2,80 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📡 Novacene Viewer – Sensor Status</title>
   <style>
-    body { font-family: sans-serif; margin: 2rem; background: #f4f4f4; }
-    input, button, select { margin: 0.5rem 0; padding: 0.5rem; width: 100%; max-width: 600px; }
-    #output { white-space: pre-wrap; background: white; padding: 1rem; margin-top: 1rem; border-radius: 5px; }
+    body { font-family: sans-serif; padding: 1em; max-width: 800px; margin: auto; }
+    textarea, select, input { width: 100%; padding: 0.5em; margin: 0.5em 0; }
+    button { padding: 0.5em 1em; margin: 1em 0; }
+    .device { padding: 0.5em; margin: 0.5em 0; border-left: 4px solid #ccc; background: #f9f9f9; }
   </style>
 </head>
 <body>
-  <h1>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h1>
+  <h2>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h2>
 
-  <label>API Token:</label>
-  <input id="apiToken" placeholder="Enter your API token">
+  <label for="apiToken">API Token:</label>
+  <input id="apiToken" type="text" placeholder="Paste your token..." />
 
-  <label>Site ID:</label>
-  <input id="siteId" value="471">
+  <label for="siteId">Site ID:</label>
+  <input id="siteId" type="number" placeholder="e.g. 471" value="471" />
 
-  <label>Zone ID (Beer Fridge = 12651):</label>
-  <input id="zoneId" value="12651">
+  <label for="zoneId">Zone ID (Beer Fridge = 12651):</label>
+  <input id="zoneId" type="number" placeholder="e.g. 12651" value="12651" />
 
-  <button onclick="fetchAll()">Fetch Devices & Sensors</button>
+  <button onclick="fetchDevices()">Fetch Devices & Sensors</button>
 
-  <hr>
+  <div id="output"></div>
 
-  <label>Sensor Token (for history):</label>
-  <input id="sensorToken" placeholder="e.g. 3f3fec49-7c23-4fef-903d-5b3fb9414403">
-
-  <label>Date Range:</label>
-  <input type="date" id="startDate"> to <input type="date" id="endDate">
-
-  <button onclick="fetchSensorHistory()">Fetch Sensor History</button>
-
-  <div id="output">Output...</div>
+  <label for="sensorDropdown">📊 Available Sensors:</label>
+  <select id="sensorDropdown">
+    <option disabled selected>Choose a sensor to explore...</option>
+  </select>
 
   <script>
-    const apiBase = 'https://api-prod.novacene.io/api/v2';
-
-    async function fetchAll() {
-      const token = document.getElementById('apiToken').value.trim();
-      const siteId = document.getElementById('siteId').value.trim();
-      const zoneId = document.getElementById('zoneId').value.trim();
+    async function fetchDevices() {
+      const apiToken = document.getElementById('apiToken').value;
+      const siteId = document.getElementById('siteId').value;
+      const zoneId = document.getElementById('zoneId').value;
       const output = document.getElementById('output');
+      const sensorDropdown = document.getElementById('sensorDropdown');
+      output.innerHTML = '⏳ Fetching devices...';
+      sensorDropdown.innerHTML = '<option disabled selected>Choose a sensor to explore...</option>';
 
-      output.textContent = 'Fetching site...';
-      const site = await fetch(`${apiBase}/sites/${siteId}`, { headers: { 'api_token': token } }).then(res => res.json());
+      const url = `https://api-prod.novacene.io/api/v2/devices?page=1&limit=10000&siteid=${siteId}&zoneids=${zoneId}`;
 
-      output.textContent = `Step 1 – Connect to Site\n\n${JSON.stringify(site, null, 2)}`;
+      const res = await fetch(url, {
+        headers: {
+          'api_token': apiToken
+        }
+      });
 
-      output.textContent += '\n\nStep 2 – Get Zones...';
-      const zones = await fetch(`${apiBase}/zones?siteid=${siteId}`, { headers: { 'api_token': token } }).then(res => res.json());
-
-      output.textContent += `\n\n${JSON.stringify(zones, null, 2)}`;
-
-      output.textContent += '\n\nStep 3 – Get Devices...';
-      const devices = await fetch(`${apiBase}/devices?page=1&limit=10000&siteid=${siteId}&zoneids=${zoneId}`, { headers: { 'api_token': token } }).then(res => res.json());
-
-      output.textContent += `\n\n${JSON.stringify(devices, null, 2)}`;
-    }
-
-    async function fetchSensorHistory() {
-      const token = document.getElementById('apiToken').value.trim();
-      const sensorToken = document.getElementById('sensorToken').value.trim();
-      const start = new Date(document.getElementById('startDate').value);
-      const end = new Date(document.getElementById('endDate').value);
-      const output = document.getElementById('output');
-
-      if (!sensorToken || isNaN(start) || isNaN(end)) {
-        return alert('Please fill all fields including sensor token and date range.');
+      if (!res.ok) {
+        output.innerHTML = '❌ Error fetching devices.';
+        return;
       }
 
-      output.textContent = 'Fetching sensor data...';
-
-      const results = [];
-
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const from = new Date(d);
-        const to = new Date(d);
-        to.setUTCHours(23, 59, 59, 999);
-
-        const url = `${apiBase}/devices/points-data?sensorToken=${sensorToken}&from=${from.toISOString()}&to=${to.toISOString()}&groupBy=hour`;
-
-        const res = await fetch(url, { headers: { 'api_token': token } }).then(r => r.json());
-
-        results.push({ date: from.toISOString().split('T')[0], count: res.length, first: res[0]?.value });
-
-        await new Promise(resolve => setTimeout(resolve, 600)); // API rate limit buffer
+      const data = await res.json();
+      if (!data.devices || !data.devices.length) {
+        output.innerHTML = '⚠️ No devices found in this zone.';
+        return;
       }
 
-      output.textContent = `\n\n📊 History for ${sensorToken} from ${start.toDateString()} to ${end.toDateString()}\n\n` + results.map(r => `${r.date}: count = ${r.count}, first value = ${r.first}`).join('\n');
+      let out = '';
+      data.devices.forEach(device => {
+        out += `<div class="device">
+          <strong>📟 ${device.name} (ID: ${device.id})</strong><br/>`;
+        if (device.sensors && device.sensors.length) {
+          device.sensors.forEach(sensor => {
+            out += `🔹 ${sensor.name}: ${sensor.lastReceivedDataValue} ${sensor.unit || ''} @ ${sensor.lastReceivedData}<br/>`;
+            sensorDropdown.innerHTML += `<option value="${sensor.sensorToken}">${device.name} – ${sensor.name}</option>`;
+          });
+        } else {
+          out += '⚠️ No sensors found for this device.';
+        }
+        out += '</div>';
+      });
+      output.innerHTML = out;
     }
   </script>
 </body>
