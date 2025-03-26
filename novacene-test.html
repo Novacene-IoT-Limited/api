@@ -1,81 +1,166 @@
+Sensor Data Fetcher
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📡 Novacene Viewer – Sensor Status</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Novacene Viewer – Sensor Status</title>
   <style>
-    body { font-family: sans-serif; padding: 1em; max-width: 800px; margin: auto; }
-    textarea, select, input { width: 100%; padding: 0.5em; margin: 0.5em 0; }
-    button { padding: 0.5em 1em; margin: 1em 0; }
-    .device { padding: 0.5em; margin: 0.5em 0; border-left: 4px solid #ccc; background: #f9f9f9; }
+    body { font-family: sans-serif; line-height: 1.4; padding: 20px; }
+    input, select, button { margin: 5px 0; padding: 5px; }
+    textarea { width: 100%; height: 200px; }
+    .device-block { margin-top: 10px; padding: 10px; background: #f0f0f0; }
   </style>
 </head>
 <body>
   <h2>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h2>
 
-  <label for="apiToken">API Token:</label>
-  <input id="apiToken" type="text" placeholder="Paste your token..." />
+  <label>API Token: <input type="text" id="apiToken" size="80"></label><br>
+  <label>Site ID: <input type="text" id="siteId" value="471"></label><br>
+  <label>Zone ID (Beer Fridge = 12651): <input type="text" id="zoneId" value="12651"></label><br>
 
-  <label for="siteId">Site ID:</label>
-  <input id="siteId" type="number" placeholder="e.g. 471" value="471" />
+  <button onclick="fetchDevicesAndSensors()">Fetch Devices & Sensors</button>
 
-  <label for="zoneId">Zone ID (Beer Fridge = 12651):</label>
-  <input id="zoneId" type="number" placeholder="e.g. 12651" value="12651" />
+  <div id="deviceSummary"></div>
 
-  <button onclick="fetchDevices()">Fetch Devices & Sensors</button>
+  <h3>📊 Available Sensors:</h3>
+  <label for="sensorDropdown">Select Sensor:</label>
+  <select id="sensorDropdown"></select><br>
 
-  <div id="output"></div>
+  <label for="startDate">Start Date:</label>
+  <input type="datetime-local" id="startDate">
+  <label for="endDate">End Date:</label>
+  <input type="datetime-local" id="endDate">
+  <button onclick="fetchSensorData()">Fetch Sensor Data</button>
 
-  <label for="sensorDropdown">📊 Available Sensors:</label>
-  <select id="sensorDropdown">
-    <option disabled selected>Choose a sensor to explore...</option>
-  </select>
+  <h3>📈 Sensor Data Output:</h3>
+  <textarea id="output"></textarea>
 
   <script>
-    async function fetchDevices() {
-      const apiToken = document.getElementById('apiToken').value;
+    let sensorMap = {};
+
+    async function fetchDevicesAndSensors() {
+      const token = document.getElementById('apiToken').value;
       const siteId = document.getElementById('siteId').value;
       const zoneId = document.getElementById('zoneId').value;
-      const output = document.getElementById('output');
-      const sensorDropdown = document.getElementById('sensorDropdown');
-      output.innerHTML = '⏳ Fetching devices...';
-      sensorDropdown.innerHTML = '<option disabled selected>Choose a sensor to explore...</option>';
-
       const url = `https://api-prod.novacene.io/api/v2/devices?page=1&limit=10000&siteid=${siteId}&zoneids=${zoneId}`;
-
-      const res = await fetch(url, {
-        headers: {
-          'api_token': apiToken
-        }
-      });
-
-      if (!res.ok) {
-        output.innerHTML = '❌ Error fetching devices.';
-        return;
-      }
-
+      const res = await fetch(url, { headers: { 'api_token': token } });
       const data = await res.json();
-      if (!data.devices || !data.devices.length) {
-        output.innerHTML = '⚠️ No devices found in this zone.';
-        return;
-      }
+      const summary = document.getElementById('deviceSummary');
+      const dropdown = document.getElementById('sensorDropdown');
+      dropdown.innerHTML = '';
+      sensorMap = {};
 
-      let out = '';
+      let output = '';
       data.devices.forEach(device => {
-        out += `<div class="device">
-          <strong>📟 ${device.name} (ID: ${device.id})</strong><br/>`;
-        if (device.sensors && device.sensors.length) {
-          device.sensors.forEach(sensor => {
-            out += `🔹 ${sensor.name}: ${sensor.lastReceivedDataValue} ${sensor.unit || ''} @ ${sensor.lastReceivedData}<br/>`;
-            sensorDropdown.innerHTML += `<option value="${sensor.sensorToken}">${device.name} – ${sensor.name}</option>`;
-          });
-        } else {
-          out += '⚠️ No sensors found for this device.';
-        }
-        out += '</div>';
+        output += `📟 ${device.name} (ID: ${device.id})\n`;
+        device.sensors.forEach(sensor => {
+          const label = `${sensor.name}`;
+          const token = sensor.sensorToken;
+          const value = sensor.lastReceivedDataValue;
+          const time = sensor.lastReceivedData;
+          output += `🔹 ${label}: ${value} ${sensor.unit || ''} @ ${time}\n`;
+          dropdown.innerHTML += `<option value="${token}">${label}</option>`;
+          sensorMap[token] = label;
+        });
+        output += '\n';
       });
-      output.innerHTML = out;
+      summary.innerText = output;
+    }
+
+    async function fetchSensorData() {
+      const token = document.getElementById('apiToken').value;
+      const sensorToken = document.getElementById('sensorDropdown').value;
+      const start = new Date(document.getElementById('startDate').value).toISOString();
+      const end = new Date(document.getElementById('endDate').value).toISOString();
+      const url = `https://api-prod.novacene.io/api/v2/points-data?sensortokens=${sensorToken}&start=${start}&end=${end}`;
+      const res = await fetch(url, { headers: { 'api_token': token } });
+      const data = await res.json();
+      const output = document.getElementById('output');
+      output.value = `Sensor: ${sensorMap[sensorToken]}\nRecords: ${data.length}\n` + data.map(p => `${p.timestamp}: ${p.value}`).join('\n');
     }
   </script>
 </body>
