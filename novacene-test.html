@@ -2,112 +2,79 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Novacene Viewer – Sensor Status</title>
+  <title>Beer Fridge Sensor Viewer</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
-    input[type="text"] { width: 100%; margin-bottom: 10px; }
-    button { padding: 10px 16px; margin-bottom: 20px; }
-    pre { background: #f7f7f7; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; max-height: 80vh; overflow-y: auto; }
+    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+    input { width: 100%; margin-bottom: 10px; }
+    button { padding: 10px 16px; }
+    pre { background: #f4f4f4; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; max-height: 80vh; overflow-y: auto; }
   </style>
 </head>
 <body>
-  <h1>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h1>
+  <h2>🍺 Beer Fridge – Device & Sensor Check</h2>
 
   <label><strong>API Token:</strong></label><br>
-  <input type="text" id="apiToken" placeholder="Paste your API token"><br>
-  <label><input type="checkbox" id="rememberKey"> Remember API key</label><br><br>
+  <input type="text" id="apiToken" placeholder="Paste your API key"><br>
 
-  <button onclick="fetchData()">Fetch Devices & Sensors</button>
+  <button onclick="fetchBeerFridge()">Fetch Sensors</button>
 
   <h3>Output</h3>
-  <pre id="output">Waiting for input...</pre>
+  <pre id="output">Waiting...</pre>
 
   <script>
-    const projectId = 145;
-
-    window.onload = () => {
-      const saved = localStorage.getItem("novacene_api_key");
-      if (saved) {
-        document.getElementById("apiToken").value = saved;
-        document.getElementById("rememberKey").checked = true;
-      }
-    };
+    const zoneId = 12651;
 
     function getSensorStatus(type, value) {
-      if (type === "co2") {
-        if (value > 1000) return "🔴 Critical";
-        if (value > 800) return "🟠 Warning";
-        return "🟢 Good";
-      }
-      if (type === "temperature") {
-        if (value > 28 || value < 16) return "🔴 Critical";
-        if (value > 25 || value < 18) return "🟠 Warning";
-        return "🟢 Good";
-      }
-      if (type === "humidity") {
-        if (value > 70 || value < 30) return "🔴 Critical";
-        if (value > 60 || value < 40) return "🟠 Warning";
-        return "🟢 Good";
-      }
+      if (type === "co2") return value > 1000 ? "🔴" : value > 800 ? "🟠" : "🟢";
+      if (type === "temperature") return value > 28 || value < 16 ? "🔴" : value > 25 || value < 18 ? "🟠" : "🟢";
+      if (type === "humidity") return value > 70 || value < 30 ? "🔴" : value > 60 || value < 40 ? "🟠" : "🟢";
       return "N/A";
     }
 
-    async function fetchData() {
+    async function fetchBeerFridge() {
       const token = document.getElementById("apiToken").value.trim();
-      if (document.getElementById("rememberKey").checked) {
-        localStorage.setItem("novacene_api_key", token);
-      }
-
       const output = document.getElementById("output");
-      output.textContent = `📦 Project ID: ${projectId}\n\n`;
+      output.textContent = "🔄 Fetching devices from zone 12651 (Beer Fridge)...";
+
+      const url = `https://api-prod.novacene.io/api/v2/devices?zoneids=${zoneId}&limit=10&nodeveui=false&includeSensors=true&nocache=${Date.now()}`;
       const headers = { "accept": "application/json", "api_token": token };
 
       try {
-        const sitesRes = await fetch(`https://api-prod.novacene.io/api/v2/sites?projectid=${projectId}`, { headers });
-        const sites = await sitesRes.json();
+        const res = await fetch(url, { headers });
+        const data = await res.json();
 
-        for (const site of sites.list || []) {
-          output.textContent += `🏢 Site: ${site.name} (ID: ${site.id})\n`;
-
-          const zonesRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${site.id}`, { headers });
-          const zones = await zonesRes.json();
-
-          for (const zone of zones.list || []) {
-            output.textContent += `  🌐 Zone: ${zone.name} (ID: ${zone.id})\n`;
-
-            const url = `https://api-prod.novacene.io/api/v2/devices?zoneids=${zone.id}&limit=100&nodeveui=false&includeSensors=true&nocache=${Date.now()}`;
-            const deviceRes = await fetch(url, { headers });
-            const deviceData = await deviceRes.json();
-
-            if (!deviceData?.list?.length) {
-              output.textContent += `    ⚠️ No devices found in this zone.\n`;
-              continue;
-            }
-
-            for (const device of deviceData.list) {
-              output.textContent += `    📟 Device: ${device.name || "Unnamed"} (ID: ${device.id})\n`;
-              const sensors = device.sensors || [];
-
-              const filterAndShow = (label, key) => {
-                const sensor = sensors.find(s => s.name?.toLowerCase().includes(key));
-                if (sensor) {
-                  const val = sensor.lastReceivedDataValue;
-                  const time = sensor.lastReceivedDataTime || sensor.lastReceivedData;
-                  const status = getSensorStatus(key, val);
-                  output.textContent += `      • ${label}: ${val} ${sensor.unit || ""} at ${time} → ${status}\n`;
-                } else {
-                  output.textContent += `      • ${label}: ❌ Not Found\n`;
-                }
-              };
-
-              filterAndShow("CO₂", "co2");
-              filterAndShow("Temperature", "temp");
-              filterAndShow("Humidity", "humid");
-            }
-          }
+        if (!data?.list?.length) {
+          output.textContent = "⚠️ No devices found in Beer Fridge zone.";
+          return;
         }
+
+        let result = `📦 Found ${data.list.length} device(s) in zone 12651:\n`;
+
+        for (const device of data.list) {
+          result += `\n📟 ${device.name} (ID: ${device.id})\n`;
+          const sensors = device.sensors || [];
+
+          const find = (key) => sensors.find(s => s.name?.toLowerCase().includes(key));
+          const show = (label, key) => {
+            const s = find(key);
+            if (!s) {
+              result += `  • ${label}: ❌ Not Found\n`;
+              return;
+            }
+            const val = s.lastReceivedDataValue;
+            const time = s.lastReceivedDataTime || s.lastReceivedData;
+            const status = getSensorStatus(key, val);
+            result += `  • ${label}: ${val} ${s.unit || ""} at ${time} → ${status}\n`;
+          };
+
+          show("CO₂", "co2");
+          show("Temperature", "temp");
+          show("Humidity", "humid");
+        }
+
+        output.textContent = result;
       } catch (err) {
-        output.textContent += `❌ Error: ${err.message}`;
+        output.textContent = "❌ Error: " + err.message;
       }
     }
   </script>
