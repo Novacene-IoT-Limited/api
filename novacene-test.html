@@ -2,29 +2,35 @@
 <html>
 <head>
   <title>Novacene Viewer – Sensor Status</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    label { font-weight: bold; }
+    select, input[type="text"] { margin: 10px 0; width: 400px; }
+    button { margin: 10px 0; }
+  </style>
 </head>
 <body>
   <h2>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h2>
 
-  <label>API Token:</label>
-  <input type="text" id="apiToken" style="width: 400px;">
-  <br>
-  <label><input type="checkbox" id="rememberKey"> Remember Key</label>
-  <br><br>
+  <label>API Token:</label><br>
+  <input type="text" id="apiToken"><br>
 
-  <button onclick="connectAndLoad()">Connect and Load Sites & Zones</button>
-  <br><br>
+  <label><input type="checkbox" id="rememberKey"> Remember Key</label><br><br>
 
-  <label>Site:</label>
-  <select id="siteDropdown" onchange="loadZones()"></select>
+  <button onclick="connectAndLoad()">Connect and Load Sites & Zones</button><br><br>
 
-  <label>Zone:</label>
-  <select id="zoneDropdown"></select>
+  <label>Site:</label><br>
+  <select id="siteDropdown" onchange="loadZones()"></select><br>
+
+  <label>Zone:</label><br>
+  <select id="zoneDropdown"></select><br><br>
+
+  <h3>📈 Sensor Data Output:</h3>
+  <textarea id="sensorOutput" style="width:100%; height:200px;"></textarea>
 
   <script>
     const apiBase = "https://platform-api.novacene.io";
 
-    // Load saved key if checkbox was previously ticked
     window.onload = () => {
       const savedKey = localStorage.getItem('novacene_api_token');
       if (savedKey) {
@@ -36,48 +42,70 @@
     function connectAndLoad() {
       const token = document.getElementById('apiToken').value.trim();
 
+      if (!token) {
+        alert("Please enter your API token.");
+        return;
+      }
+
       if (document.getElementById('rememberKey').checked) {
         localStorage.setItem('novacene_api_token', token);
+      } else {
+        localStorage.removeItem('novacene_api_token');
       }
 
       fetch(`${apiBase}/sites`, {
         headers: { 'api_token': token }
       })
-      .then(res => res.json())
-      .then(data => {
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to fetch sites');
+        return response.json();
+      })
+      .then(sites => {
         const siteDropdown = document.getElementById('siteDropdown');
         siteDropdown.innerHTML = '';
-        data.forEach(site => {
+        sites.forEach(site => {
           const option = document.createElement('option');
           option.value = site.id;
-          option.textContent = site.name;
+          option.textContent = `${site.name} (ID: ${site.id})`;
           siteDropdown.appendChild(option);
         });
-        // Load zones for first site automatically
+
+        // Auto-load zones for first site
         loadZones();
       })
-      .catch(err => alert('Error loading sites: ' + err));
+      .catch(error => {
+        alert('Error loading sites: ' + error);
+      });
     }
 
     function loadZones() {
       const token = document.getElementById('apiToken').value.trim();
       const siteId = document.getElementById('siteDropdown').value;
 
+      if (!siteId) {
+        return;
+      }
+
       fetch(`${apiBase}/zones?siteids=${siteId}`, {
         headers: { 'api_token': token }
       })
-      .then(res => res.json())
-      .then(data => {
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to fetch zones');
+        return response.json();
+      })
+      .then(zones => {
         const zoneDropdown = document.getElementById('zoneDropdown');
         zoneDropdown.innerHTML = '';
-        data.forEach(zone => {
+        zones.forEach(zone => {
           const option = document.createElement('option');
           option.value = zone.id;
-          option.textContent = zone.name;
+          option.textContent = `${zone.name} (ID: ${zone.id})`;
           zoneDropdown.appendChild(option);
         });
       })
-      .catch(err => alert('Error loading zones: ' + err));
+      .catch(error => {
+        alert('Error loading zones: ' + error);
+      });
     }
   </script>
 </body>
