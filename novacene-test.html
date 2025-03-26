@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Novacene API Viewer (Debug)</title>
+  <title>Novacene API Viewer (Debug Mode - Project Devices)</title>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
     input { width: 80%; margin-bottom: 10px; }
@@ -11,13 +11,10 @@
   </style>
 </head>
 <body>
-  <h1>Novacene API Viewer (Debug Mode)</h1>
+  <h1>Novacene API Viewer (Using projectId = 145)</h1>
 
   <label><strong>API Token:</strong></label><br>
   <input type="text" id="apiToken" placeholder="Paste your API key here"><br>
-
-  <label><strong>Site ID:</strong></label><br>
-  <input type="text" id="siteId" value="471"><br>
 
   <label><strong>Date Range:</strong></label><br>
   <input type="date" id="startDate">
@@ -53,7 +50,6 @@
 
     async function fetchData() {
       const token = document.getElementById('apiToken').value.trim();
-      const siteId = document.getElementById('siteId').value.trim();
       const start = document.getElementById('startDate').value;
       const end = document.getElementById('endDate').value;
       const headers = { 'api_token': token };
@@ -61,54 +57,29 @@
       output.textContent = "⏳ Fetching data...";
 
       try {
-        const [zonesRes, devicesRes] = await Promise.all([
-          fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${siteId}`, { headers }),
-          fetch(`https://api-prod.novacene.io/api/v2/devices?siteid=${siteId}`, { headers }),
-        ]);
-
-        const zones = await zonesRes.json();
+        const devicesRes = await fetch(
+          `https://api-prod.novacene.io/api/v2/devices?projectid=145`,
+          { headers }
+        );
         const devices = await devicesRes.json();
 
-        const zoneMap = {};
-        zones.list?.forEach(z => zoneMap[z.id] = { ...z, children: [] });
-        const rootZones = [];
+        let outputText = `📡 Devices (From Project 145):\n`;
+        const dateList = getDateList(start, end);
 
-        zones.list?.forEach(z => {
-          if (z.parentId && zoneMap[z.parentId]) {
-            zoneMap[z.parentId].children.push(zoneMap[z.id]);
-          } else {
-            rootZones.push(zoneMap[z.id]);
-          }
-        });
-
-        function renderZoneTree(zones, indent = "") {
-          return zones.map(z => {
-            let str = `${indent}- ${z.name} (ID: ${z.id})\n`;
-            if (z.children.length > 0) {
-              str += renderZoneTree(z.children, indent + "  ");
-            }
-            return str;
-          }).join("");
+        if (!devices?.list?.length) {
+          outputText += `⚠️ No devices found for project 145.\n`;
+          output.textContent = outputText;
+          return;
         }
 
-        let outputText = `📍 Zones:\n${renderZoneTree(rootZones)}\n\n📡 Devices:\n`;
-        const dateList = getDateList(start, end);
-if (!devices?.list?.length) {
-  outputText += `⚠️ No devices found in site ${siteId}.\n\n`;
-  console.warn("⚠️ devices.list is empty or undefined");
-  output.textContent = outputText;
-  return;
-}
         for (const d of devices.list || []) {
           outputText += `- Name: ${d.name || "Unnamed"}\n`;
           outputText += `  ID: ${d.id}\n`;
           outputText += `  Zone ID: ${d.zoneId || "N/A"}\n`;
           outputText += `  Device EUI: ${d.deveui || "N/A"}\n`;
 
-          // Show raw device object for debug
           outputText += `  🛠 DEBUG: Raw Device JSON:\n`;
-          outputText += JSON.stringify(d, null, 2).slice(0, 1000) + "...\n\n"; // Trim if too long
-          console.log("🔎 Device object:", d);
+          outputText += JSON.stringify(d, null, 2).slice(0, 1000) + "...\n\n";
 
           const sensorIds = d.graphSettings?.sensorsOrder?.active || [];
           outputText += `  Active Sensors: ${sensorIds.length} found\n`;
@@ -122,7 +93,7 @@ if (!devices?.list?.length) {
             outputText += `    Sensor ID: ${sensorId}\n`;
 
             for (const day of dateList) {
-              const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${siteId}&sensor=${sensorId}&start=${day}&end=${day}`;
+              const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${d.siteId}&sensor=${sensorId}&start=${day}&end=${day}`;
               console.log(`📡 Fetching: ${url}`);
 
               try {
