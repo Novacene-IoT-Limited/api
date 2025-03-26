@@ -2,73 +2,112 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Novacene Device Sensor Test</title>
+  <title>Novacene Viewer – Sensor Status</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+    body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
     input[type="text"] { width: 100%; margin-bottom: 10px; }
-    pre { background: #f0f0f0; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; }
+    button { padding: 10px 16px; margin-bottom: 20px; }
+    pre { background: #f7f7f7; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; max-height: 80vh; overflow-y: auto; }
   </style>
 </head>
 <body>
-  <h2>📡 Novacene Sensor Test: Beer Fridge</h2>
+  <h1>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h1>
 
   <label><strong>API Token:</strong></label><br>
-  <input type="text" id="apiToken" placeholder="Paste your API key here"><br>
+  <input type="text" id="apiToken" placeholder="Paste your API token"><br>
+  <label><input type="checkbox" id="rememberKey"> Remember API key</label><br><br>
 
-  <button onclick="fetchSensors()">Fetch Sensors & Data</button>
+  <button onclick="fetchData()">Fetch Devices & Sensors</button>
 
-  <h3>Output:</h3>
-  <pre id="output">Waiting...</pre>
+  <h3>Output</h3>
+  <pre id="output">Waiting for input...</pre>
 
   <script>
-    const deveui = "24E124785E289576";
-    const siteid = 471;
+    const projectId = 145;
 
-    function getToday() {
-      return new Date().toISOString().split("T")[0];
+    window.onload = () => {
+      const saved = localStorage.getItem("novacene_api_key");
+      if (saved) {
+        document.getElementById("apiToken").value = saved;
+        document.getElementById("rememberKey").checked = true;
+      }
+    };
+
+    function getSensorStatus(type, value) {
+      if (type === "co2") {
+        if (value > 1000) return "🔴 Critical";
+        if (value > 800) return "🟠 Warning";
+        return "🟢 Good";
+      }
+      if (type === "temperature") {
+        if (value > 28 || value < 16) return "🔴 Critical";
+        if (value > 25 || value < 18) return "🟠 Warning";
+        return "🟢 Good";
+      }
+      if (type === "humidity") {
+        if (value > 70 || value < 30) return "🔴 Critical";
+        if (value > 60 || value < 40) return "🟠 Warning";
+        return "🟢 Good";
+      }
+      return "N/A";
     }
 
-    async function fetchSensors() {
+    async function fetchData() {
       const token = document.getElementById("apiToken").value.trim();
-      const output = document.getElementById("output");
-      const headers = { "api_token": token };
+      if (document.getElementById("rememberKey").checked) {
+        localStorage.setItem("novacene_api_key", token);
+      }
 
-      output.textContent = "🔄 Fetching sensors for device " + deveui + "...";
+      const output = document.getElementById("output");
+      output.textContent = `📦 Project ID: ${projectId}\n\n`;
+      const headers = { "accept": "application/json", "api_token": token };
 
       try {
-        // Get sensors by DevEUI
-        const res = await fetch(`https://api-prod.novacene.io/api/v2/devices/sensors-data?deveui=${deveui}`, { headers });
-        const data = await res.json();
+        const sitesRes = await fetch(`https://api-prod.novacene.io/api/v2/sites?projectid=${projectId}`, { headers });
+        const sites = await sitesRes.json();
 
-        if (!Array.isArray(data) || !data.length) {
-          output.textContent = "⚠️ No sensors found for this device.";
-          return;
-        }
+        for (const site of sites.list || []) {
+          output.textContent += `🏢 Site: ${site.name} (ID: ${site.id})\n`;
 
-        output.textContent = `✅ Found ${data.length} sensor(s):\n`;
+          const zonesRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${site.id}`, { headers });
+          const zones = await zonesRes.json();
 
-        const today = getToday();
-        for (const sensor of data) {
-          output.textContent += `\n📏 ${sensor.name} (${sensor.unit || "?"})\n`;
+          for (const zone of zones.list || []) {
+            output.textContent += `  🌐 Zone: ${zone.name} (ID: ${zone.id})\n`;
 
-          const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${siteid}&sensor=${sensor.sensorToken}&start=${today}&end=${today}`;
-          try {
-            const res2 = await fetch(url, { headers });
-            const sensorData = await res2.json();
+            const url = `https://api-prod.novacene.io/api/v2/devices?zoneids=${zone.id}&limit=100&nodeveui=false&includeSensors=true&nocache=${Date.now()}`;
+            const deviceRes = await fetch(url, { headers });
+            const deviceData = await deviceRes.json();
 
-            if (sensorData?.list?.length) {
-              for (const pt of sensorData.list) {
-                output.textContent += `  • ${pt.value} at ${pt.time}\n`;
-              }
-            } else {
-              output.textContent += `  ⚠️ No data found for today.\n`;
+            if (!deviceData?.list?.length) {
+              output.textContent += `    ⚠️ No devices found in this zone.\n`;
+              continue;
             }
-          } catch (err2) {
-            output.textContent += `  ❌ Failed to get data for sensor ${sensor.sensorToken}\n`;
+
+            for (const device of deviceData.list) {
+              output.textContent += `    📟 Device: ${device.name || "Unnamed"} (ID: ${device.id})\n`;
+              const sensors = device.sensors || [];
+
+              const filterAndShow = (label, key) => {
+                const sensor = sensors.find(s => s.name?.toLowerCase().includes(key));
+                if (sensor) {
+                  const val = sensor.lastReceivedDataValue;
+                  const time = sensor.lastReceivedDataTime || sensor.lastReceivedData;
+                  const status = getSensorStatus(key, val);
+                  output.textContent += `      • ${label}: ${val} ${sensor.unit || ""} at ${time} → ${status}\n`;
+                } else {
+                  output.textContent += `      • ${label}: ❌ Not Found\n`;
+                }
+              };
+
+              filterAndShow("CO₂", "co2");
+              filterAndShow("Temperature", "temp");
+              filterAndShow("Humidity", "humid");
+            }
           }
         }
       } catch (err) {
-        output.textContent = "❌ Error fetching sensors: " + err.message;
+        output.textContent += `❌ Error: ${err.message}`;
       }
     }
   </script>
