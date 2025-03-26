@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Novacene Device Viewer – Site 145 (Project 13)</title>
+  <title>Novacene Viewer – Project 145</title>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
     input[type="text"] { width: 80%; margin-bottom: 10px; }
@@ -11,13 +11,11 @@
   </style>
 </head>
 <body>
-  <h1>📡 Novacene Device Viewer – Site 145 (Project 13)</h1>
+  <h1>📡 Novacene API Viewer – Project 145</h1>
 
   <label><strong>API Token:</strong></label><br>
   <input type="text" id="apiToken" placeholder="Paste your API key here"><br>
-  <label>
-    <input type="checkbox" id="rememberKey"> Remember API key
-  </label><br><br>
+  <label><input type="checkbox" id="rememberKey"> Remember API key</label><br><br>
 
   <label><strong>Date Range:</strong></label><br>
   <input type="date" id="startDate"> to <input type="date" id="endDate"><br>
@@ -28,8 +26,7 @@
   <pre id="output">Waiting for input...</pre>
 
   <script>
-    const siteId = 145;
-    const projectId = 13;
+    const projectId = 145;
 
     document.getElementById("startDate").value = new Date().toISOString().split('T')[0];
     document.getElementById("endDate").value = new Date().toISOString().split('T')[0];
@@ -62,62 +59,69 @@
       const start = document.getElementById('startDate').value;
       const end = document.getElementById('endDate').value;
       const output = document.getElementById('output');
-      output.textContent = "⏳ Fetching devices for site 145...";
-
       const headers = { 'api_token': token };
       const dateList = getDateList(start, end);
-      let outputText = `📦 Project ID: ${projectId}, Site ID: ${siteId}\n\n`;
+
+      let outputText = `📦 Project ID: ${projectId}\n\n`;
 
       try {
-        // Get zones
-        const zonesRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${siteId}`, { headers });
-        const zones = await zonesRes.json();
-        outputText += `📍 Zones (${zones.list?.length || 0}):\n`;
-        zones.list?.forEach(z => {
-          outputText += `  - ${z.name} (ID: ${z.id}, devices: ${z.devices})\n`;
-        });
+        const sitesRes = await fetch(`https://api-prod.novacene.io/api/v2/sites?projectid=${projectId}`, { headers });
+        const sites = await sitesRes.json();
 
-        // Get devices
-        const devicesRes = await fetch(
-          `https://api-prod.novacene.io/api/v2/devices?siteid=${siteId}&projectid=${projectId}&isRemoved=true`,
-          { headers }
-        );
-        const devices = await devicesRes.json();
-
-        if (!devices?.list?.length) {
-          outputText += `⚠️ No devices found in site 145.\n`;
+        if (!sites?.list?.length) {
+          outputText += `⚠️ No sites found.\n`;
           output.textContent = outputText;
           return;
         }
 
-        for (const d of devices.list) {
-          outputText += `\n📡 Device: ${d.name || "Unnamed"}\n`;
-          outputText += `  ID: ${d.id}, zoneId: ${d.zoneId || "❓"}, deveui: ${d.deveui || "N/A"}\n`;
+        for (const site of sites.list) {
+          outputText += `🏢 Site: ${site.name} (ID: ${site.id})\n`;
 
-          const sensorIds = d.graphSettings?.sensorsOrder?.active || [];
-          if (!sensorIds.length) {
-            outputText += `  ⚠️ No active sensors\n`;
+          const zonesRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${site.id}`, { headers });
+          const zones = await zonesRes.json();
+          outputText += `  🌐 Zones (${zones.list?.length || 0}):\n`;
+          zones.list?.forEach(z => {
+            outputText += `    - ${z.name} (ID: ${z.id}, Devices: ${z.devices})\n`;
+          });
+
+          const devicesRes = await fetch(`https://api-prod.novacene.io/api/v2/devices?siteid=${site.id}&isRemoved=true`, { headers });
+          const devices = await devicesRes.json();
+
+          if (!devices?.list?.length) {
+            outputText += `  ⚠️ No devices found.\n`;
             continue;
           }
 
-          outputText += `  Active Sensors (${sensorIds.length}):\n`;
-          for (const sensorId of sensorIds) {
-            outputText += `    Sensor ID: ${sensorId}\n`;
-            for (const day of dateList) {
-              const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${siteId}&sensor=${sensorId}&start=${day}&end=${day}`;
-              try {
-                const res = await fetch(url, { headers });
-                const json = await res.json();
-                if (json?.list?.length) {
-                  outputText += `      📅 ${day} (${json.list.length} values):\n`;
-                  json.list.forEach(pt => {
-                    outputText += `        - ${pt.field || pt.key || "val"}: ${pt.value} at ${pt.time}\n`;
-                  });
-                } else {
-                  outputText += `      📅 ${day}: (no data)\n`;
+          for (const d of devices.list) {
+            outputText += `\n  📡 Device: ${d.name || "Unnamed"}\n`;
+            outputText += `    ID: ${d.id}, Zone ID: ${d.zoneId || "❓"}, deveui: ${d.deveui || "N/A"}\n`;
+
+            const sensorIds = d.graphSettings?.sensorsOrder?.active || [];
+            if (!sensorIds.length) {
+              outputText += `    ⚠️ No active sensors\n`;
+              continue;
+            }
+
+            outputText += `    Active Sensors (${sensorIds.length}):\n`;
+            for (const sensorId of sensorIds) {
+              outputText += `      Sensor ID: ${sensorId}\n`;
+              for (const day of dateList) {
+                const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${site.id}&sensor=${sensorId}&start=${day}&end=${day}`;
+                try {
+                  const res = await fetch(url, { headers });
+                  const json = await res.json();
+
+                  if (json?.list?.length) {
+                    outputText += `        📅 ${day} (${json.list.length} values):\n`;
+                    json.list.forEach(pt => {
+                      outputText += `          - ${pt.field || pt.key || "value"}: ${pt.value} at ${pt.time}\n`;
+                    });
+                  } else {
+                    outputText += `        📅 ${day}: (no data)\n`;
+                  }
+                } catch (err) {
+                  outputText += `        ❌ Error fetching data for ${day}\n`;
                 }
-              } catch (err) {
-                outputText += `      ❌ Error fetching data for ${day}\n`;
               }
             }
           }
