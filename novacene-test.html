@@ -2,139 +2,73 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Novacene Viewer – Project 145 (limit=200)</title>
+  <title>Novacene Device Sensor Test</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
-    input[type="text"] { width: 80%; margin-bottom: 10px; }
-    button { padding: 8px 16px; margin-top: 10px; }
-    pre { background: #f7f7f7; padding: 10px; white-space: pre-wrap; max-height: 80vh; overflow-y: auto; border: 1px solid #ddd; }
+    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+    input[type="text"] { width: 100%; margin-bottom: 10px; }
+    pre { background: #f0f0f0; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <h1>📡 Novacene Viewer – All Sites in Project 145</h1>
+  <h2>📡 Novacene Sensor Test: Beer Fridge</h2>
 
   <label><strong>API Token:</strong></label><br>
   <input type="text" id="apiToken" placeholder="Paste your API key here"><br>
-  <label><input type="checkbox" id="rememberKey"> Remember API key</label><br><br>
 
-  <label><strong>Date Range:</strong></label><br>
-  <input type="date" id="startDate"> to <input type="date" id="endDate"><br>
+  <button onclick="fetchSensors()">Fetch Sensors & Data</button>
 
-  <button onclick="fetchData()">Fetch Data</button>
-
-  <h3>Output</h3>
-  <pre id="output">Waiting for input...</pre>
+  <h3>Output:</h3>
+  <pre id="output">Waiting...</pre>
 
   <script>
-    const projectId = 145;
+    const deveui = "24E124785E289576";
+    const siteid = 471;
 
-    document.getElementById("startDate").value = new Date().toISOString().split('T')[0];
-    document.getElementById("endDate").value = new Date().toISOString().split('T')[0];
-
-    window.onload = () => {
-      const savedKey = localStorage.getItem("novacene_api_key");
-      if (savedKey) {
-        document.getElementById("apiToken").value = savedKey;
-        document.getElementById("rememberKey").checked = true;
-      }
-    };
-
-    function getDateList(start, end) {
-      const dates = [];
-      let current = new Date(start);
-      const last = new Date(end);
-      while (current <= last) {
-        dates.push(current.toISOString().split('T')[0]);
-        current.setDate(current.getDate() + 1);
-      }
-      return dates;
+    function getToday() {
+      return new Date().toISOString().split("T")[0];
     }
 
-    async function fetchData() {
-      const token = document.getElementById('apiToken').value.trim();
-      const remember = document.getElementById('rememberKey').checked;
-      if (remember) localStorage.setItem("novacene_api_key", token);
-      else localStorage.removeItem("novacene_api_key");
+    async function fetchSensors() {
+      const token = document.getElementById("apiToken").value.trim();
+      const output = document.getElementById("output");
+      const headers = { "api_token": token };
 
-      const start = document.getElementById('startDate').value;
-      const end = document.getElementById('endDate').value;
-      const output = document.getElementById('output');
-      const headers = { 'api_token': token };
-      const dateList = getDateList(start, end);
-      let outputText = `📦 Project ID: ${projectId}\n\n`;
+      output.textContent = "🔄 Fetching sensors for device " + deveui + "...";
 
       try {
-        const sitesRes = await fetch(`https://api-prod.novacene.io/api/v2/sites?projectid=${projectId}`, { headers });
-        const sites = await sitesRes.json();
+        // Get sensors by DevEUI
+        const res = await fetch(`https://api-prod.novacene.io/api/v2/devices/sensors-data?deveui=${deveui}`, { headers });
+        const data = await res.json();
 
-        if (!sites?.list?.length) {
-          outputText += `⚠️ No sites found for this project.\n`;
-          output.textContent = outputText;
+        if (!Array.isArray(data) || !data.length) {
+          output.textContent = "⚠️ No sensors found for this device.";
           return;
         }
 
-        for (const site of sites.list) {
-          outputText += `🏢 Site: ${site.name} (ID: ${site.id})\n`;
+        output.textContent = `✅ Found ${data.length} sensor(s):\n`;
 
-          const zonesRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${site.id}`, { headers });
-          const zones = await zonesRes.json();
-          outputText += `  🌐 Zones (${zones.list?.length || 0}):\n`;
-          zones.list?.forEach(z => {
-            outputText += `    - ${z.name} (ID: ${z.id}, Devices: ${z.devices})\n`;
-          });
+        const today = getToday();
+        for (const sensor of data) {
+          output.textContent += `\n📏 ${sensor.name} (${sensor.unit || "?"})\n`;
 
-          // ✅ Now with limit=200
-          const devicesRes = await fetch(
-            `https://api-prod.novacene.io/api/v2/devices?siteid=${site.id}&isRemoved=true&limit=200`,
-            { headers }
-          );
-          const devices = await devicesRes.json();
+          const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${siteid}&sensor=${sensor.sensorToken}&start=${today}&end=${today}`;
+          try {
+            const res2 = await fetch(url, { headers });
+            const sensorData = await res2.json();
 
-          if (!devices?.list?.length) {
-            outputText += `  ⚠️ No devices found in this site.\n`;
-            continue;
-          }
-
-          for (const d of devices.list) {
-            outputText += `\n  📡 Device: ${d.name || "Unnamed"}\n`;
-            outputText += `    ID: ${d.id}, Zone ID: ${d.zoneId || "❓"}, deveui: ${d.deveui || "N/A"}\n`;
-
-            const sensorIds = d.graphSettings?.sensorsOrder?.active || [];
-            if (!sensorIds.length) {
-              outputText += `    ⚠️ No active sensors\n`;
-              continue;
-            }
-
-            outputText += `    Active Sensors:\n`;
-            for (const sensorId of sensorIds) {
-              outputText += `      Sensor ID: ${sensorId}\n`;
-
-              for (const day of dateList) {
-                const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${site.id}&sensor=${sensorId}&start=${day}&end=${day}`;
-                try {
-                  const res = await fetch(url, { headers });
-                  const json = await res.json();
-
-                  if (json?.list?.length) {
-                    outputText += `        📅 ${day} (${json.list.length} values):\n`;
-                    json.list.forEach(pt => {
-                      outputText += `          - ${pt.field || pt.key || "value"}: ${pt.value} at ${pt.time}\n`;
-                    });
-                  } else {
-                    outputText += `        📅 ${day}: (no data)\n`;
-                  }
-                } catch (err) {
-                  outputText += `        ❌ Error fetching data for ${day}\n`;
-                }
+            if (sensorData?.list?.length) {
+              for (const pt of sensorData.list) {
+                output.textContent += `  • ${pt.value} at ${pt.time}\n`;
               }
+            } else {
+              output.textContent += `  ⚠️ No data found for today.\n`;
             }
+          } catch (err2) {
+            output.textContent += `  ❌ Failed to get data for sensor ${sensor.sensorToken}\n`;
           }
         }
-
-        output.textContent = outputText;
       } catch (err) {
-        output.textContent = `❌ Error: ${err.message}`;
-        console.error(err);
+        output.textContent = "❌ Error fetching sensors: " + err.message;
       }
     }
   </script>
