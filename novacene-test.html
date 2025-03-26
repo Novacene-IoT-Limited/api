@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Novacene API Viewer (Remember API Key)</title>
+  <title>Novacene Device Viewer – Site 145 (Project 13)</title>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
     input[type="text"] { width: 80%; margin-bottom: 10px; }
@@ -11,7 +11,7 @@
   </style>
 </head>
 <body>
-  <h1>Novacene API Viewer (With Remembered API Key)</h1>
+  <h1>📡 Novacene Device Viewer – Site 145 (Project 13)</h1>
 
   <label><strong>API Token:</strong></label><br>
   <input type="text" id="apiToken" placeholder="Paste your API key here"><br>
@@ -28,16 +28,12 @@
   <pre id="output">Waiting for input...</pre>
 
   <script>
-    function getTodayDate() {
-      const today = new Date();
-      return today.toISOString().split('T')[0];
-    }
+    const siteId = 145;
+    const projectId = 13;
 
-    // Prefill dates
-    document.getElementById("startDate").value = getTodayDate();
-    document.getElementById("endDate").value = getTodayDate();
+    document.getElementById("startDate").value = new Date().toISOString().split('T')[0];
+    document.getElementById("endDate").value = new Date().toISOString().split('T')[0];
 
-    // Handle localStorage for API key
     window.onload = () => {
       const savedKey = localStorage.getItem("novacene_api_key");
       if (savedKey) {
@@ -60,88 +56,71 @@
     async function fetchData() {
       const token = document.getElementById('apiToken').value.trim();
       const remember = document.getElementById('rememberKey').checked;
-
-      if (remember) {
-        localStorage.setItem("novacene_api_key", token);
-      } else {
-        localStorage.removeItem("novacene_api_key");
-      }
+      if (remember) localStorage.setItem("novacene_api_key", token);
+      else localStorage.removeItem("novacene_api_key");
 
       const start = document.getElementById('startDate').value;
       const end = document.getElementById('endDate').value;
-      const headers = {
-        'api_token': token,
-        'Content-Type': 'application/json'
-      };
       const output = document.getElementById('output');
-      output.textContent = "⏳ Fetching devices using /devices/fd...";
+      output.textContent = "⏳ Fetching devices for site 145...";
 
-      const projectId = 145;
-      let outputText = `📦 Project ID: ${projectId}\n\n`;
+      const headers = { 'api_token': token };
       const dateList = getDateList(start, end);
+      let outputText = `📦 Project ID: ${projectId}, Site ID: ${siteId}\n\n`;
 
       try {
+        // Get zones
+        const zonesRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${siteId}`, { headers });
+        const zones = await zonesRes.json();
+        outputText += `📍 Zones (${zones.list?.length || 0}):\n`;
+        zones.list?.forEach(z => {
+          outputText += `  - ${z.name} (ID: ${z.id}, devices: ${z.devices})\n`;
+        });
+
+        // Get devices
         const devicesRes = await fetch(
-          `https://api-prod.novacene.io/api/v2/devices/fd`,
-          {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ projectid: projectId })
-          }
+          `https://api-prod.novacene.io/api/v2/devices?siteid=${siteId}&projectid=${projectId}&isRemoved=true`,
+          { headers }
         );
         const devices = await devicesRes.json();
 
         if (!devices?.list?.length) {
-          outputText += `⚠️ No devices found via /devices/fd\n`;
+          outputText += `⚠️ No devices found in site 145.\n`;
           output.textContent = outputText;
           return;
         }
 
         for (const d of devices.list) {
-          outputText += `📡 Device: ${d.name || "Unnamed"}\n`;
-          outputText += `  ID: ${d.id}\n`;
-          outputText += `  siteId: ${d.siteId || "❓"}\n`;
-          outputText += `  zoneId: ${d.zoneId || "❓"}\n`;
-          outputText += `  deveui: ${d.deveui || "N/A"}\n`;
+          outputText += `\n📡 Device: ${d.name || "Unnamed"}\n`;
+          outputText += `  ID: ${d.id}, zoneId: ${d.zoneId || "❓"}, deveui: ${d.deveui || "N/A"}\n`;
 
           const sensorIds = d.graphSettings?.sensorsOrder?.active || [];
-
           if (!sensorIds.length) {
-            outputText += `  ⚠️ No active sensors found\n\n`;
+            outputText += `  ⚠️ No active sensors\n`;
             continue;
           }
 
           outputText += `  Active Sensors (${sensorIds.length}):\n`;
-
           for (const sensorId of sensorIds) {
             outputText += `    Sensor ID: ${sensorId}\n`;
-
             for (const day of dateList) {
-              const siteId = d.siteId;
               const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${siteId}&sensor=${sensorId}&start=${day}&end=${day}`;
-
               try {
-                const res = await fetch(url, { headers: { 'api_token': token } });
+                const res = await fetch(url, { headers });
                 const json = await res.json();
-
                 if (json?.list?.length) {
                   outputText += `      📅 ${day} (${json.list.length} values):\n`;
-                  json.list.forEach(point => {
-                    const time = point.time || "";
-                    const label = point.field || point.key || "value";
-                    outputText += `        - ${label}: ${point.value} at ${time}\n`;
+                  json.list.forEach(pt => {
+                    outputText += `        - ${pt.field || pt.key || "val"}: ${pt.value} at ${pt.time}\n`;
                   });
                 } else {
                   outputText += `      📅 ${day}: (no data)\n`;
                 }
               } catch (err) {
                 outputText += `      ❌ Error fetching data for ${day}\n`;
-                console.error(err);
               }
             }
           }
-
-          outputText += `\n`;
         }
 
         output.textContent = outputText;
