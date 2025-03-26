@@ -1,139 +1,136 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</title>
-<style>
-body { font-family: sans-serif; padding: 20px; }
-input { width: 100%; padding: 6px; margin: 4px 0; }
-button { padding: 10px 20px; margin-top: 10px; }
-pre { background: #f6f6f6; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; max-height: 400px; overflow: auto; }
-h3 { margin-top: 30px; }
-</style>
+  <meta charset="UTF-8" />
+  <title>Novacene Viewer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+    input, select, button {
+      margin-top: 5px;
+      width: 100%;
+      max-width: 300px;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 10px;
+    }
+    #messages {
+      margin-top: 10px;
+      color: red;
+    }
+  </style>
 </head>
 <body>
-<h1>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h1>
+  <h1>Novacene Viewer</h1>
 
-<label><strong>API Token:</strong></label>
-<input type="text" id="apiToken" placeholder="Paste your API token here">
+  <label>API Token:</label>
+  <input type="text" id="apiToken" placeholder="Enter your API token" />
 
-<label><strong>Site ID:</strong></label>
-<input type="text" id="siteId" value="471">
+  <button id="loadSitesBtn">Load Sites</button>
+  <label>Sites:</label>
+  <select id="sitesDropdown"></select>
 
-<label><strong>Zone ID (Beer Fridge = 12651):</strong></label>
-<input type="text" id="zoneId" value="12651">
+  <button id="loadZonesBtn">Load Zones</button>
+  <label>Zones:</label>
+  <select id="zonesDropdown"></select>
 
-  <label><strong>From Date (YYYY-MM-DD):</strong></label>
-  <input type="text" id="fromDate" value="2025-03-01">
+  <button id="loadSensorsBtn">Load Sensors</button>
+  <div id="messages"></div>
+  <div id="sensorData"></div>
 
-  <label><strong>To Date (YYYY-MM-DD):</strong></label>
-  <input type="text" id="toDate" value="2025-03-25">
-
-<button onclick="runSteps()">Fetch Devices & Sensors</button>
-
-<h3>Step 1 – Connect to Site</h3>
-@@ -40,23 +34,17 @@
-<h3>Step 3 – Get Devices</h3>
-<pre id="output3">Not started...</pre>
-
-  <h3>Step 4 – Sensor Metadata</h3>
-  <h3>Step 4 – Sensor Data Summary</h3>
-<pre id="output4">Not started...</pre>
-
-  <h3>Step 5 – Sensor History (from /points-data)</h3>
-  <pre id="output5">Not started...</pre>
-
-<script>
-async function runSteps() {
-const token = document.getElementById('apiToken').value.trim();
-const siteId = document.getElementById('siteId').value.trim();
-const zoneId = document.getElementById('zoneId').value.trim();
-      const from = document.getElementById('fromDate').value.trim();
-      const to = document.getElementById('toDate').value.trim();
-
-const headers = {
-'accept': 'application/json',
-        'Content-Type': 'application/json',
-'api_token': token
-};
-
-@@ -66,69 +54,42 @@
-let siteData = await siteResponse.json();
-document.getElementById('output1').textContent = JSON.stringify(siteData, null, 2);
-
-      // Step 2: Get zones for site
-      // Step 2: Get zones
-document.getElementById('output2').textContent = '🔄 Fetching zones...';
-let zoneRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${siteId}`, { headers });
-let zoneData = await zoneRes.json();
-document.getElementById('output2').textContent = JSON.stringify(zoneData.list, null, 2);
-
-      // Step 3: Get devices in zone
-      document.getElementById('output3').textContent = '🔄 Fetching devices...';
-      let devRes = await fetch(`https://api-prod.novacene.io/api/v2/devices?page=1&limit=10000&siteid=${siteId}&zoneids=${zoneId}&includeSensors=true&nodeveui=false&nocache=${Date.now()}`, { headers });
-      // Step 3: Get devices in selected zone (limit capped to 200)
-      document.getElementById('output3').textContent = '🔄 Fetching devices (limit 200)...';
-      let devRes = await fetch(`https://api-prod.novacene.io/api/v2/devices?page=1&limit=200&siteid=${siteId}&zoneids=${zoneId}&includeSensors=true&nodeveui=false&nocache=${Date.now()}`, { headers });
-let devData = await devRes.json();
-document.getElementById('output3').textContent = JSON.stringify(devData, null, 2);
-
-      // Step 4: Show sensors for devices
-      // Step 4: Parse sensor data
-const summary = [];
-const devices = devData?.devices || devData?.list || [];
-      const sensorTokens = [];
-
-      if (devices.length === 200) {
-        summary.push('⚠️ API limit of 200 devices reached. Results may be incomplete. Consider paging.');
-      }
-
-if (devices.length === 0) {
-        document.getElementById('output4').textContent = '⚠️ No devices found in this zone.';
-        return;
-        summary.push('⚠️ No devices found in this zone.');
-}
-
-for (let d of devices) {
-summary.push(`📟 ${d.name} (ID: ${d.id})`);
-if (Array.isArray(d.sensors)) {
-for (let s of d.sensors) {
-            sensorTokens.push(s.sensorToken);
-            summary.push(`  - ${s.name} [${s.sensorToken}]`);
-            summary.push(`  - ${s.name}: ${s.lastReceivedDataValue} ${s.unit || ''} at ${s.lastReceivedDataTime || s.lastReceivedData}`);
-}
-} else {
-summary.push('  ⚠️ No sensors found.');
-}
-}
-
-document.getElementById('output4').textContent = summary.join('\n');
-
-      // Step 5: Fetch sensor history using points-data
-      if (sensorTokens.length === 0) {
-        document.getElementById('output5').textContent = '⚠️ No sensor tokens available for history lookup.';
+  <script>
+    async function loadSites() {
+      const token = document.getElementById('apiToken').value.trim();
+      if (!token) {
+        document.getElementById('messages').textContent = 'Please enter a valid API token.';
         return;
       }
-
-      document.getElementById('output5').textContent = '🔄 Fetching historical sensor data...';
-
-      let postBody = {
-        sensorTokens: sensorTokens,
-        from: `${from}T00:00:00Z`,
-        to: `${to}T23:59:59Z`,
-        interval: "day"
-      };
-
       try {
-        const historyRes = await fetch(`https://api-prod.novacene.io/api/v2/devices/points-data`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(postBody)
+        const res = await fetch('https://platform-api.novacene.io/sites', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
-
-        const historyData = await historyRes.json();
-        document.getElementById('output5').textContent = JSON.stringify(historyData, null, 2);
-      } catch (err) {
-        document.getElementById('output5').textContent = '❌ Failed to fetch sensor history. ' + err.message;
+        if (!res.ok) {
+          throw new Error('Failed to load sites');
+        }
+        const sites = await res.json();
+        const dropdown = document.getElementById('sitesDropdown');
+        dropdown.innerHTML = '';
+        sites.forEach(site => {
+          const opt = document.createElement('option');
+          opt.value = site.id;
+          opt.textContent = site.name;
+          dropdown.appendChild(opt);
+        });
+      } catch (e) {
+        document.getElementById('messages').textContent = e.message;
       }
-}
-</script>
+    }
+
+    async function loadZones() {
+      const token = document.getElementById('apiToken').value.trim();
+      const siteId = document.getElementById('sitesDropdown').value;
+      if (!token || !siteId) {
+        document.getElementById('messages').textContent = 'Please load sites and select one first.';
+        return;
+      }
+      try {
+        const res = await fetch(`https://platform-api.novacene.io/zones?siteid=${siteId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!res.ok) {
+          throw new Error('Failed to load zones');
+        }
+        const zones = await res.json();
+        const dropdown = document.getElementById('zonesDropdown');
+        dropdown.innerHTML = '';
+        zones.forEach(zone => {
+          const opt = document.createElement('option');
+          opt.value = zone.id;
+          opt.textContent = zone.name;
+          dropdown.appendChild(opt);
+        });
+      } catch (e) {
+        document.getElementById('messages').textContent = e.message;
+      }
+    }
+
+    async function loadSensors() {
+      const token = document.getElementById('apiToken').value.trim();
+      const zoneId = document.getElementById('zonesDropdown').value;
+      if (!token || !zoneId) {
+        document.getElementById('messages').textContent = 'Please load zones and select one first.';
+        return;
+      }
+      try {
+        const res = await fetch(`https://platform-api.novacene.io/sensors?zoneid=${zoneId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!res.ok) {
+          throw new Error('Failed to load sensors');
+        }
+        const sensors = await res.json();
+        document.getElementById('sensorData').innerHTML = `<pre>${JSON.stringify(sensors, null, 2)}</pre>`;
+      } catch (e) {
+        document.getElementById('messages').textContent = e.message;
+      }
+    }
+
+    document.getElementById('loadSitesBtn').addEventListener('click', loadSites);
+    document.getElementById('loadZonesBtn').addEventListener('click', loadZones);
+    document.getElementById('loadSensorsBtn').addEventListener('click', loadSensors);
+  </script>
 </body>
+</html>
