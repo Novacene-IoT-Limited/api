@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Novacene API Viewer</title>
+  <title>Novacene API Debug Viewer</title>
   <style>
     body { font-family: sans-serif; padding: 20px; }
     input { width: 80%; margin-bottom: 10px; }
@@ -12,7 +12,7 @@
 </head>
 <body>
 
-  <h1>Novacene API Viewer</h1>
+  <h1>Novacene API Viewer (Debug Mode)</h1>
 
   <label><strong>API Token:</strong></label><br>
   <input type="text" id="apiToken" placeholder="Paste your API key here"><br>
@@ -70,7 +70,6 @@
         const zones = await zonesRes.json();
         const devices = await devicesRes.json();
 
-        // ---- Build Zone Tree ----
         const zoneMap = {};
         zones.list?.forEach(z => zoneMap[z.id] = { ...z, children: [] });
         const rootZones = [];
@@ -97,6 +96,8 @@
         const dateList = getDateList(start, end);
 
         for (const d of devices.list || []) {
+          outputText += `\n\n🛠 DEBUG: Raw Device JSON:\n`;
+outputText += JSON.stringify(d, null, 2) + "\n\n";
           outputText += `- Name: ${d.name || "Unnamed"}\n`;
           outputText += `  ID: ${d.id}\n`;
           outputText += `  Zone ID: ${d.zoneId || "N/A"}\n`;
@@ -104,6 +105,16 @@
 
           const sensorIds = d.graphSettings?.sensorsOrder?.active || [];
           outputText += `  Active Sensors: ${sensorIds.length} found\n`;
+          outputText += `  Sensor IDs:\n`;
+
+          if (sensorIds.length === 0) {
+            outputText += `    (No active sensors)\n\n`;
+            continue;
+          }
+
+          for (const sensorId of sensorIds) {
+            outputText += `    - ${sensorId}\n`;
+          }
 
           for (const sensorId of sensorIds) {
             for (const day of dateList) {
@@ -116,17 +127,19 @@
                 const pointData = await pointRes.json();
 
                 if (pointData?.list?.length) {
+                  outputText += `    📅 ${day} (${pointData.list.length} values):\n`;
                   for (const point of pointData.list) {
                     const t = point.time || "";
                     const val = point.value;
                     const label = point.field || point.key || "value";
-                    outputText += `    - ${label}: ${val} at ${t}\n`;
+                    outputText += `      - ${label}: ${val} at ${t}\n`;
                   }
                 } else {
-                  outputText += `    (No data for ${day})\n`;
+                  outputText += `    📅 ${day}: No data\n`;
                 }
               } catch (err) {
                 outputText += `    ❌ Error fetching sensor ${sensorId} for ${day}\n`;
+                console.error(err);
               }
             }
           }
@@ -137,6 +150,7 @@
         output.textContent = outputText;
       } catch (err) {
         output.textContent = `❌ Error: ${err.message}`;
+        console.error(err);
       }
     }
   </script>
