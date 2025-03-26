@@ -1,17 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Novacene API Debug Viewer</title>
+  <meta charset="UTF-8" />
+  <title>Novacene API Viewer (Debug)</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
+    body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
     input { width: 80%; margin-bottom: 10px; }
     button { padding: 8px 16px; margin-top: 10px; }
-    pre { background: #f7f7f7; padding: 10px; white-space: pre-wrap; max-height: 80vh; overflow-y: scroll; }
+    pre { background: #f7f7f7; padding: 10px; white-space: pre-wrap; max-height: 80vh; overflow-y: auto; border: 1px solid #ddd; }
   </style>
 </head>
 <body>
-
   <h1>Novacene API Viewer (Debug Mode)</h1>
 
   <label><strong>API Token:</strong></label><br>
@@ -59,7 +58,7 @@
       const end = document.getElementById('endDate').value;
       const headers = { 'api_token': token };
       const output = document.getElementById('output');
-      output.textContent = "⏳ Fetching zones and devices...";
+      output.textContent = "⏳ Fetching data...";
 
       try {
         const [zonesRes, devicesRes] = await Promise.all([
@@ -96,49 +95,47 @@
         const dateList = getDateList(start, end);
 
         for (const d of devices.list || []) {
-          outputText += `\n\n🛠 DEBUG: Raw Device JSON:\n`;
-          outputText += JSON.stringify(d, null, 2) + "\n\n";
           outputText += `- Name: ${d.name || "Unnamed"}\n`;
           outputText += `  ID: ${d.id}\n`;
           outputText += `  Zone ID: ${d.zoneId || "N/A"}\n`;
           outputText += `  Device EUI: ${d.deveui || "N/A"}\n`;
 
+          // Show raw device object for debug
+          outputText += `  🛠 DEBUG: Raw Device JSON:\n`;
+          outputText += JSON.stringify(d, null, 2).slice(0, 1000) + "...\n\n"; // Trim if too long
+          console.log("🔎 Device object:", d);
+
           const sensorIds = d.graphSettings?.sensorsOrder?.active || [];
           outputText += `  Active Sensors: ${sensorIds.length} found\n`;
-          outputText += `  Sensor IDs:\n`;
 
           if (sensorIds.length === 0) {
-            outputText += `    (No active sensors)\n\n`;
+            outputText += `    ⚠️ No active sensors found\n\n`;
             continue;
           }
 
           for (const sensorId of sensorIds) {
-            outputText += `    - ${sensorId}\n`;
-          }
+            outputText += `    Sensor ID: ${sensorId}\n`;
 
-          for (const sensorId of sensorIds) {
             for (const day of dateList) {
               const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${siteId}&sensor=${sensorId}&start=${day}&end=${day}`;
-              console.log(`🔍 Fetching sensor ${sensorId} for ${day}`);
-              console.log(`📡 URL: ${url}`);
+              console.log(`📡 Fetching: ${url}`);
 
               try {
-                const pointRes = await fetch(url, { headers });
-                const pointData = await pointRes.json();
+                const res = await fetch(url, { headers });
+                const json = await res.json();
 
-                if (pointData?.list?.length) {
-                  outputText += `    📅 ${day} (${pointData.list.length} values):\n`;
-                  for (const point of pointData.list) {
-                    const t = point.time || "";
-                    const val = point.value;
+                if (json?.list?.length) {
+                  outputText += `    📅 ${day} (${json.list.length} values):\n`;
+                  json.list.forEach(point => {
+                    const time = point.time || "";
                     const label = point.field || point.key || "value";
-                    outputText += `      - ${label}: ${val} at ${t}\n`;
-                  }
+                    outputText += `      - ${label}: ${point.value} at ${time}\n`;
+                  });
                 } else {
-                  outputText += `    📅 ${day}: No data\n`;
+                  outputText += `    📅 ${day}: (no data)\n`;
                 }
               } catch (err) {
-                outputText += `    ❌ Error fetching sensor ${sensorId} for ${day}\n`;
+                outputText += `    ❌ Error fetching data for sensor ${sensorId} on ${day}\n`;
                 console.error(err);
               }
             }
@@ -150,7 +147,7 @@
         output.textContent = outputText;
       } catch (err) {
         output.textContent = `❌ Error: ${err.message}`;
-        console.error(err);
+        console.error("Fetch error:", err);
       }
     }
   </script>
