@@ -33,7 +33,9 @@
       if (!token) return alert("Enter an API token.");
       try {
         const res = await fetch('https://platform-api.novacene.io/sites', {
-          headers: { 'Authorization': `Bearer ${token}` }
+     headers: {
+  'Authorization': `Bearer ${apiToken}`
+}
         });
         if (!res.ok) throw new Error('Failed to load sites');
         const sites = await res.json();
