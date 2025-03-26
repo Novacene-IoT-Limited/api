@@ -97,7 +97,7 @@
 
         for (const d of devices.list || []) {
           outputText += `\n\n🛠 DEBUG: Raw Device JSON:\n`;
-outputText += JSON.stringify(d, null, 2) + "\n\n";
+          outputText += JSON.stringify(d, null, 2) + "\n\n";
           outputText += `- Name: ${d.name || "Unnamed"}\n`;
           outputText += `  ID: ${d.id}\n`;
           outputText += `  Zone ID: ${d.zoneId || "N/A"}\n`;
