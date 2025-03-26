@@ -1,150 +1,89 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Novacene Viewer – Sensor Status</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Novacene Debug Viewer</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    label { font-weight: bold; }
-    select, input[type="text"] { margin: 10px 0; width: 400px; }
-    button { margin: 10px 0; }
+    body { font-family: sans-serif; padding: 2rem; }
+    select, input, button { margin: 0.5rem 0; display: block; width: 100%; max-width: 400px; }
+    label { font-weight: bold; margin-top: 1rem; }
   </style>
 </head>
 <body>
-  <h2>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h2>
+  <h1>📡 Novacene Debug Viewer – Site & Zone Loader</h1>
 
-  <label>API Token:</label><br>
-  <input type="text" id="apiToken"><br>
+  <label for="apiToken">API Token:</label>
+  <input type="text" id="apiToken" placeholder="Paste your Novacene API token">
 
-  <label><input type="checkbox" id="rememberKey"> Remember Key</label><br><br>
+  <label><input type="checkbox" id="rememberKey"> Remember Key</label>
 
-  <button onclick="connectAndLoad()">Connect and Load Sites & Zones</button><br><br>
+  <button id="connectBtn">Connect and Load Sites & Zones</button>
 
-  <label>Site:</label><br>
-  <select id="siteDropdown" onchange="loadZones()"></select><br>
+  <label for="siteSelect">Site:</label>
+  <select id="siteSelect"></select>
 
-  <label>Zone:</label><br>
-  <select id="zoneDropdown" onchange="loadSensorData()"></select><br><br>
+  <label for="zoneSelect">Zone:</label>
+  <select id="zoneSelect"></select>
 
-  <h3>📈 Sensor Data Output:</h3>
-  <textarea id="sensorOutput" style="width:100%; height:200px;"></textarea>
+  <pre id="debugOutput" style="background:#f0f0f0;padding:1rem;margin-top:2rem;"></pre>
 
   <script>
-    const apiBase = "https://platform-api.novacene.io";
+    const API_BASE = 'https://platform-api.novacene.io';
 
-    window.onload = () => {
-      const savedKey = localStorage.getItem('novacene_api_token');
-      if (savedKey) {
-        document.getElementById('apiToken').value = savedKey;
-        document.getElementById('rememberKey').checked = true;
-      }
-    };
+    const apiTokenInput = document.getElementById('apiToken');
+    const siteSelect = document.getElementById('siteSelect');
+    const zoneSelect = document.getElementById('zoneSelect');
+    const debugOutput = document.getElementById('debugOutput');
 
-    function connectAndLoad() {
-      const token = document.getElementById('apiToken').value.trim();
+    if (localStorage.getItem('novacene_api_token')) {
+      apiTokenInput.value = localStorage.getItem('novacene_api_token');
+      document.getElementById('rememberKey').checked = true;
+    }
 
-      if (!token) {
-        alert("Please enter your API token.");
-        return;
-      }
+    document.getElementById('connectBtn').addEventListener('click', async () => {
+      const apiToken = apiTokenInput.value.trim();
+      if (!apiToken) return alert('Missing API token');
 
       if (document.getElementById('rememberKey').checked) {
-        localStorage.setItem('novacene_api_token', token);
+        localStorage.setItem('novacene_api_token', apiToken);
       } else {
         localStorage.removeItem('novacene_api_token');
       }
 
-      fetch(`${apiBase}/sites`, {
-        headers: { 'api_token': token }
-      })
-      .then(response => {
-        if (!response.ok) throw new Error('Failed to fetch sites');
-        return response.json();
-      })
-      .then(sites => {
-        const siteDropdown = document.getElementById('siteDropdown');
-        siteDropdown.innerHTML = '';
-        sites.forEach(site => {
-          const option = document.createElement('option');
-          option.value = site.id;
-          option.textContent = `${site.name} (ID: ${site.id})`;
-          siteDropdown.appendChild(option);
+      try {
+        debugOutput.textContent = 'Loading sites...';
+        const siteRes = await fetch(`${API_BASE}/sites`, {
+          headers: { 'api_token': apiToken }
         });
 
-        // Auto-load zones for first site if available
-        if (sites.length > 0) {
-          siteDropdown.value = sites[0].id;
-          loadZones();
-        }
-      })
-      .catch(error => {
-        console.error('Error loading sites:', error);
-        alert('Error loading sites: ' + error.message);
-      });
-    }
+        const sites = await siteRes.json();
+        debugOutput.textContent += `\nSites: ${JSON.stringify(sites, null, 2)}`;
 
-    function loadZones() {
-      const token = document.getElementById('apiToken').value.trim();
-      const siteId = document.getElementById('siteDropdown').value;
+        siteSelect.innerHTML = sites.map(site => 
+          `<option value="${site.id}">${site.name}</option>`
+        ).join('');
 
-      if (!siteId) {
-        return;
-      }
+        const selectedSiteId = siteSelect.value;
+        debugOutput.textContent += `\nSelected Site ID: ${selectedSiteId}`;
 
-      fetch(`${apiBase}/zones?siteids=${siteId}`, {
-        headers: { 'api_token': token }
-      })
-      .then(response => {
-        if (!response.ok) throw new Error('Failed to fetch zones');
-        return response.json();
-      })
-      .then(zones => {
-        const zoneDropdown = document.getElementById('zoneDropdown');
-        zoneDropdown.innerHTML = '';
-        zones.forEach(zone => {
-          const option = document.createElement('option');
-          option.value = zone.id;
-          option.textContent = `${zone.name} (ID: ${zone.id})`;
-          zoneDropdown.appendChild(option);
+        debugOutput.textContent += '\nLoading zones...';
+        const zoneRes = await fetch(`${API_BASE}/zones?siteid=${selectedSiteId}`, {
+          headers: { 'api_token': apiToken }
         });
 
-        // Auto-load sensor data for first zone if available
-        if (zones.length > 0) {
-          zoneDropdown.value = zones[0].id;
-          loadSensorData();
-        }
-      })
-      .catch(error => {
-        console.error('Error loading zones:', error);
-        alert('Error loading zones: ' + error.message);
-      });
-    }
+        const zones = await zoneRes.json();
+        debugOutput.textContent += `\nZones: ${JSON.stringify(zones, null, 2)}`;
 
-    function loadSensorData() {
-      const token = document.getElementById('apiToken').value.trim();
-      const zoneId = document.getElementById('zoneDropdown').value;
-
-      if (!zoneId) {
-        return;
+        zoneSelect.innerHTML = zones.map(zone => 
+          `<option value="${zone.id}">${zone.name}</option>`
+        ).join('');
+      } catch (err) {
+        console.error(err);
+        debugOutput.textContent += `\n\n❌ Error: ${err}`;
+        alert('Error loading sites or zones. See debug output below.');
       }
-
-      // Assuming there's an endpoint like /sensors?zoneid={zoneId} for fetching sensor data
-      fetch(`${apiBase}/sensors?zoneid=${zoneId}`, {
-        headers: { 'api_token': token }
-      })
-      .then(response => {
-        if (!response.ok) throw new Error('Failed to fetch sensor data');
-        return response.json();
-      })
-      .then(data => {
-        const sensorOutput = document.getElementById('sensorOutput');
-        sensorOutput.value = JSON.stringify(data, null, 2); // Display sensor data as JSON
-      })
-      .catch(error => {
-        console.error('Error loading sensor data:', error);
-        alert('Error loading sensor data: ' + error.message);
-      });
-    }
+    });
   </script>
 </body>
 </html>
-
