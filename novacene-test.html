@@ -1,137 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Novacene Viewer - Sensor Data</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 20px;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        h1 {
-            text-align: center;
-            font-size: 2em;
-            margin-bottom: 20px;
-        }
-
-        label {
-            font-weight: bold;
-            margin-top: 10px;
-        }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            margin-top: 5px;
-            margin-bottom: 20px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-
-        button {
-            width: 100%;
-            padding: 10px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1.1em;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-
-        .output {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Novacene Viewer</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    label { display: block; margin-top: 10px; }
+    input, select, button { margin-top: 5px; width: 100%; max-width: 300px; }
+    pre { background: #f4f4f4; padding: 10px; }
+  </style>
 </head>
 <body>
+  <h1>Novacene Viewer</h1>
 
-<div class="container">
-    <h1>Novacene Viewer – Sensor Status</h1>
+  <label>API Token:</label>
+  <input type="text" id="apiToken" placeholder="Enter your API token" />
 
-    <!-- API Token Input -->
-    <label for="api_token">API Token:</label>
-    <input type="text" id="api_token" placeholder="Enter API Token">
+  <button id="loadSitesBtn">Load Sites</button>
+  <label>Sites:</label>
+  <select id="sitesDropdown"></select>
 
-    <!-- Project ID Input -->
-    <label for="project_id">Project ID:</label>
-    <input type="text" id="project_id" placeholder="Enter Project ID">
+  <button id="loadZonesBtn">Load Zones</button>
+  <label>Zones:</label>
+  <select id="zonesDropdown"></select>
 
-    <!-- Site ID Input -->
-    <label for="site_id">Site ID:</label>
-    <input type="text" id="site_id" placeholder="Enter Site ID">
+  <button id="loadSensorsBtn">Load Sensors</button>
+  <div id="sensorData"></div>
 
-    <!-- Zone ID Input -->
-    <label for="zone_id">Zone ID:</label>
-    <input type="text" id="zone_id" placeholder="Enter Zone ID">
-
-    <!-- Button to fetch data -->
-    <button onclick="fetchSensorData()">Fetch Sensor Data</button>
-
-    <!-- Output Area -->
-    <div class="output" id="sensor_output"></div>
-</div>
-
-<script>
-    async function fetchSensorData() {
-        // Get input values
-        const apiToken = document.getElementById('api_token').value;
-        const projectId = document.getElementById('project_id').value;
-        const siteId = document.getElementById('site_id').value;
-        const zoneId = document.getElementById('zone_id').value;
-
-        if (!apiToken || !projectId || !siteId || !zoneId) {
-            alert("Please fill in all fields.");
-            return;
-        }
-
-        // Construct the API URL for devices and sensors
-        const url = `https://platform-api.novacene.io/devices?zoneids=${zoneId}&limit=100&nodeveui=false&includeSensors=true&nocache=${Date.now()}`;
-        
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    'api_token': apiToken,
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to load data');
-            }
-
-            const data = await response.json();
-
-            // Output the data
-            const outputDiv = document.getElementById('sensor_output');
-            outputDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-        } catch (error) {
-            const outputDiv = document.getElementById('sensor_output');
-            outputDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
-        }
+  <script>
+    async function loadSites() {
+      const token = document.getElementById('apiToken').value;
+      if (!token) return alert("Enter an API token.");
+      try {
+        const res = await fetch('https://platform-api.novacene.io/sites', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load sites');
+        const sites = await res.json();
+        const dropdown = document.getElementById('sitesDropdown');
+        dropdown.innerHTML = '';
+        sites.forEach(site => {
+          const opt = document.createElement('option');
+          opt.value = site.id;
+          opt.textContent = site.name;
+          dropdown.appendChild(opt);
+        });
+      } catch (e) {
+        alert(e.message);
+      }
     }
-</script>
 
+    async function loadZones() {
+      const token = document.getElementById('apiToken').value;
+      const siteId = document.getElementById('sitesDropdown').value;
+      if (!token || !siteId) return alert("Select a site first.");
+      try {
+        const res = await fetch(`https://platform-api.novacene.io/zones?siteid=${siteId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load zones');
+        const zones = await res.json();
+        const dropdown = document.getElementById('zonesDropdown');
+        dropdown.innerHTML = '';
+        zones.forEach(zone => {
+          const opt = document.createElement('option');
+          opt.value = zone.id;
+          opt.textContent = zone.name;
+          dropdown.appendChild(opt);
+        });
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function loadSensors() {
+      const token = document.getElementById('apiToken').value;
+      const zoneId = document.getElementById('zonesDropdown').value;
+      if (!token || !zoneId) return alert("Select a zone first.");
+      try {
+        const res = await fetch(`https://platform-api.novacene.io/sensors?zoneid=${zoneId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load sensors');
+        const sensors = await res.json();
+        document.getElementById('sensorData').innerHTML = `<pre>${JSON.stringify(sensors, null, 2)}</pre>`;
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    document.getElementById('loadSitesBtn').addEventListener('click', loadSites);
+    document.getElementById('loadZonesBtn').addEventListener('click', loadZones);
+    document.getElementById('loadSensorsBtn').addEventListener('click', loadSensors);
+  </script>
 </body>
 </html>
