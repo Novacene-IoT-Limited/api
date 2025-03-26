@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Novacene API Viewer (Final Version)</title>
+  <title>Novacene API Viewer (Devices by Project)</title>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
     input { width: 80%; margin-bottom: 10px; }
@@ -11,7 +11,7 @@
   </style>
 </head>
 <body>
-  <h1>Novacene API Viewer (Project 145 → Sites → Devices → Sensors)</h1>
+  <h1>Novacene API Viewer (Devices via projectid=145)</h1>
 
   <label><strong>API Token:</strong></label><br>
   <input type="text" id="apiToken" placeholder="Paste your API key here"><br>
@@ -60,39 +60,50 @@
       let outputText = `📦 Project ID: ${projectId}\n`;
 
       try {
-        // Step 1: Get sites for the project
+        // Step 1: Get all sites (used for name matching)
         const sitesRes = await fetch(`https://api-prod.novacene.io/api/v2/sites?projectid=${projectId}`, { headers });
         const sites = await sitesRes.json();
-
-        if (!sites?.list?.length) {
-          outputText += `⚠️ No sites found for project ${projectId}\n`;
-          output.textContent = outputText;
-          return;
+        const siteMap = {};
+        for (const s of sites.list || []) {
+          siteMap[s.id] = s.name;
         }
 
         const dateList = getDateList(start, end);
 
-        for (const site of sites.list) {
-          outputText += `\n🏢 Site: ${site.name} (ID: ${site.id})\n`;
+        // Step 2: Fetch all devices by projectid
+        const devicesRes = await fetch(`https://api-prod.novacene.io/api/v2/devices?projectid=${projectId}`, { headers });
+        const devices = await devicesRes.json();
 
-          // Step 2: Get zones for the site
-          const zonesRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${site.id}`, { headers });
+        if (!devices?.list?.length) {
+          outputText += `⚠️ No devices found for project ${projectId}\n`;
+          output.textContent = outputText;
+          return;
+        }
+
+        const groupedBySite = {};
+
+        // Group devices by siteId
+        for (const d of devices.list) {
+          const sid = d.siteId || "unknown";
+          if (!groupedBySite[sid]) groupedBySite[sid] = [];
+          groupedBySite[sid].push(d);
+        }
+
+        for (const siteId in groupedBySite) {
+          const siteName = siteMap[siteId] || `Unknown Site ${siteId}`;
+          outputText += `\n🏢 Site: ${siteName} (ID: ${siteId})\n`;
+
+          // Optional: fetch zones for this site
+          const zonesRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${siteId}`, { headers });
           const zones = await zonesRes.json();
-          outputText += `  🌐 Zones:\n`;
-          for (const zone of zones.list || []) {
-            outputText += `    - ${zone.name} (ID: ${zone.id})\n`;
+          if (zones?.list?.length) {
+            outputText += `  🌐 Zones:\n`;
+            for (const zone of zones.list) {
+              outputText += `    - ${zone.name} (ID: ${zone.id})\n`;
+            }
           }
 
-          // Step 3: Get devices for the site (using siteid again)
-          const devicesRes = await fetch(`https://api-prod.novacene.io/api/v2/devices?siteid=${site.id}`, { headers });
-          const devices = await devicesRes.json();
-
-          if (!devices?.list?.length) {
-            outputText += `  ⚠️ No devices found in site ${site.id}\n`;
-            continue;
-          }
-
-          for (const d of devices.list) {
+          for (const d of groupedBySite[siteId]) {
             outputText += `\n  📡 Device: ${d.name || "Unnamed"}\n`;
             outputText += `    ID: ${d.id}\n`;
             outputText += `    Zone ID: ${d.zoneId || "N/A"}\n`;
@@ -100,18 +111,17 @@
 
             const sensorIds = d.graphSettings?.sensorsOrder?.active || [];
 
-            if (sensorIds.length === 0) {
+            if (!sensorIds.length) {
               outputText += `    ⚠️ No active sensors\n`;
               continue;
             }
 
-            outputText += `    Active Sensors (${sensorIds.length}):\n`;
-
+            outputText += `    Active Sensors:\n`;
             for (const sensorId of sensorIds) {
               outputText += `      Sensor ID: ${sensorId}\n`;
 
               for (const day of dateList) {
-                const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${site.id}&sensor=${sensorId}&start=${day}&end=${day}`;
+                const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${siteId}&sensor=${sensorId}&start=${day}&end=${day}`;
                 try {
                   const res = await fetch(url, { headers });
                   const json = await res.json();
