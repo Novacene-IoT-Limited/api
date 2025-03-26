@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Novacene API Viewer (Debug Mode - Project Devices)</title>
+  <title>Novacene API Viewer (Project Devices + Sensor Data)</title>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
     input { width: 80%; margin-bottom: 10px; }
@@ -11,7 +11,7 @@
   </style>
 </head>
 <body>
-  <h1>Novacene API Viewer (Using projectId = 145)</h1>
+  <h1>Novacene API Viewer (Project 145)</h1>
 
   <label><strong>API Token:</strong></label><br>
   <input type="text" id="apiToken" placeholder="Paste your API key here"><br>
@@ -56,74 +56,89 @@
       const output = document.getElementById('output');
       output.textContent = "⏳ Fetching data...";
 
+      const projectId = 145;
+      let outputText = `📦 Project ID: ${projectId}\n`;
+
       try {
-        const devicesRes = await fetch(
-          `https://api-prod.novacene.io/api/v2/devices?projectid=145`,
-          { headers }
-        );
-        const devices = await devicesRes.json();
+        // Step 1: Get sites in the project
+        const sitesRes = await fetch(`https://api-prod.novacene.io/api/v2/sites?projectid=${projectId}`, { headers });
+        const sites = await sitesRes.json();
 
-        let outputText = `📡 Devices (From Project 145):\n`;
-        const dateList = getDateList(start, end);
-
-        if (!devices?.list?.length) {
-          outputText += `⚠️ No devices found for project 145.\n`;
+        if (!sites?.list?.length) {
+          outputText += `⚠️ No sites found for project ${projectId}\n`;
           output.textContent = outputText;
           return;
         }
 
-        for (const d of devices.list || []) {
-          outputText += `- Name: ${d.name || "Unnamed"}\n`;
-          outputText += `  ID: ${d.id}\n`;
-          outputText += `  Zone ID: ${d.zoneId || "N/A"}\n`;
-          outputText += `  Device EUI: ${d.deveui || "N/A"}\n`;
+        const dateList = getDateList(start, end);
 
-          outputText += `  🛠 DEBUG: Raw Device JSON:\n`;
-          outputText += JSON.stringify(d, null, 2).slice(0, 1000) + "...\n\n";
+        for (const site of sites.list) {
+          outputText += `\n🏢 Site: ${site.name} (ID: ${site.id})\n`;
 
-          const sensorIds = d.graphSettings?.sensorsOrder?.active || [];
-          outputText += `  Active Sensors: ${sensorIds.length} found\n`;
+          // Step 2: Get zones
+          const zonesRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${site.id}`, { headers });
+          const zones = await zonesRes.json();
+          outputText += `  🌐 Zones:\n`;
+          for (const zone of zones.list || []) {
+            outputText += `    - ${zone.name} (ID: ${zone.id})\n`;
+          }
 
-          if (sensorIds.length === 0) {
-            outputText += `    ⚠️ No active sensors found\n\n`;
+          // Step 3: Get devices for the site
+          const devicesRes = await fetch(`https://api-prod.novacene.io/api/v2/devices?siteid=${site.id}`, { headers });
+          const devices = await devicesRes.json();
+
+          if (!devices?.list?.length) {
+            outputText += `  ⚠️ No devices found in site ${site.id}\n`;
             continue;
           }
 
-          for (const sensorId of sensorIds) {
-            outputText += `    Sensor ID: ${sensorId}\n`;
+          for (const d of devices.list) {
+            outputText += `\n  📡 Device: ${d.name || "Unnamed"}\n`;
+            outputText += `    ID: ${d.id}\n`;
+            outputText += `    Zone ID: ${d.zoneId || "N/A"}\n`;
+            outputText += `    Device EUI: ${d.deveui || "N/A"}\n`;
 
-            for (const day of dateList) {
-              const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${d.siteId}&sensor=${sensorId}&start=${day}&end=${day}`;
-              console.log(`📡 Fetching: ${url}`);
+            const sensorIds = d.graphSettings?.sensorsOrder?.active || [];
 
-              try {
-                const res = await fetch(url, { headers });
-                const json = await res.json();
+            if (sensorIds.length === 0) {
+              outputText += `    ⚠️ No active sensors\n`;
+              continue;
+            }
 
-                if (json?.list?.length) {
-                  outputText += `    📅 ${day} (${json.list.length} values):\n`;
-                  json.list.forEach(point => {
-                    const time = point.time || "";
-                    const label = point.field || point.key || "value";
-                    outputText += `      - ${label}: ${point.value} at ${time}\n`;
-                  });
-                } else {
-                  outputText += `    📅 ${day}: (no data)\n`;
+            outputText += `    Active Sensors (${sensorIds.length}):\n`;
+
+            for (const sensorId of sensorIds) {
+              outputText += `      Sensor ID: ${sensorId}\n`;
+
+              for (const day of dateList) {
+                const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${site.id}&sensor=${sensorId}&start=${day}&end=${day}`;
+                try {
+                  const res = await fetch(url, { headers });
+                  const json = await res.json();
+
+                  if (json?.list?.length) {
+                    outputText += `        📅 ${day} (${json.list.length} values):\n`;
+                    json.list.forEach(point => {
+                      const time = point.time || "";
+                      const label = point.field || point.key || "value";
+                      outputText += `          - ${label}: ${point.value} at ${time}\n`;
+                    });
+                  } else {
+                    outputText += `        📅 ${day}: (no data)\n`;
+                  }
+                } catch (err) {
+                  outputText += `        ❌ Error fetching data for ${day}\n`;
+                  console.error(err);
                 }
-              } catch (err) {
-                outputText += `    ❌ Error fetching data for sensor ${sensorId} on ${day}\n`;
-                console.error(err);
               }
             }
           }
-
-          outputText += `\n`;
         }
 
         output.textContent = outputText;
       } catch (err) {
         output.textContent = `❌ Error: ${err.message}`;
-        console.error("Fetch error:", err);
+        console.error(err);
       }
     }
   </script>
