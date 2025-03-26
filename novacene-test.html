@@ -2,79 +2,132 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Beer Fridge Sensor Viewer</title>
+  <title>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
-    input { width: 100%; margin-bottom: 10px; }
-    button { padding: 10px 16px; }
-    pre { background: #f4f4f4; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; max-height: 80vh; overflow-y: auto; }
+    body { font-family: sans-serif; padding: 20px; }
+    input { width: 100%; padding: 6px; margin: 4px 0; }
+    button { padding: 10px 20px; margin-top: 10px; }
+    pre { background: #f6f6f6; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; max-height: 400px; overflow: auto; }
+    h3 { margin-top: 30px; }
   </style>
 </head>
 <body>
-  <h2>🍺 Beer Fridge – Device & Sensor Check</h2>
+  <h1>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h1>
 
-  <label><strong>API Token:</strong></label><br>
-  <input type="text" id="apiToken" placeholder="Paste your API key"><br>
+  <label><strong>API Token:</strong></label>
+  <input type="text" id="apiToken" placeholder="Paste your API token here">
 
-  <button onclick="fetchBeerFridge()">Fetch Sensors</button>
+  <label><strong>Site ID:</strong></label>
+  <input type="text" id="siteId" value="471">
 
-  <h3>Output</h3>
-  <pre id="output">Waiting...</pre>
+  <label><strong>Zone ID (Beer Fridge = 12651):</strong></label>
+  <input type="text" id="zoneId" value="12651">
+
+  <label><strong>From Date (YYYY-MM-DD):</strong></label>
+  <input type="text" id="fromDate" value="2025-03-01">
+
+  <label><strong>To Date (YYYY-MM-DD):</strong></label>
+  <input type="text" id="toDate" value="2025-03-25">
+
+  <button onclick="runSteps()">Fetch Devices & Sensors</button>
+
+  <h3>Step 1 – Connect to Site</h3>
+  <pre id="output1">Not started...</pre>
+
+  <h3>Step 2 – Get Zones</h3>
+  <pre id="output2">Not started...</pre>
+
+  <h3>Step 3 – Get Devices</h3>
+  <pre id="output3">Not started...</pre>
+
+  <h3>Step 4 – Sensor Metadata</h3>
+  <pre id="output4">Not started...</pre>
+
+  <h3>Step 5 – Sensor History (from /points-data)</h3>
+  <pre id="output5">Not started...</pre>
 
   <script>
-    const zoneId = 12651;
+    async function runSteps() {
+      const token = document.getElementById('apiToken').value.trim();
+      const siteId = document.getElementById('siteId').value.trim();
+      const zoneId = document.getElementById('zoneId').value.trim();
+      const from = document.getElementById('fromDate').value.trim();
+      const to = document.getElementById('toDate').value.trim();
 
-    function getSensorStatus(type, value) {
-      if (type === "co2") return value > 1000 ? "🔴" : value > 800 ? "🟠" : "🟢";
-      if (type === "temperature") return value > 28 || value < 16 ? "🔴" : value > 25 || value < 18 ? "🟠" : "🟢";
-      if (type === "humidity") return value > 70 || value < 30 ? "🔴" : value > 60 || value < 40 ? "🟠" : "🟢";
-      return "N/A";
-    }
+      const headers = {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'api_token': token
+      };
 
-    async function fetchBeerFridge() {
-      const token = document.getElementById("apiToken").value.trim();
-      const output = document.getElementById("output");
-      output.textContent = "🔄 Fetching devices from zone 12651 (Beer Fridge)...";
+      // Step 1: Confirm site connection
+      document.getElementById('output1').textContent = '🔄 Fetching site data...';
+      let siteResponse = await fetch(`https://api-prod.novacene.io/api/v2/sites/${siteId}`, { headers });
+      let siteData = await siteResponse.json();
+      document.getElementById('output1').textContent = JSON.stringify(siteData, null, 2);
 
-      const url = `https://api-prod.novacene.io/api/v2/devices?zoneids=${zoneId}&limit=10&nodeveui=false&includeSensors=true&nocache=${Date.now()}`;
-      const headers = { "accept": "application/json", "api_token": token };
+      // Step 2: Get zones for site
+      document.getElementById('output2').textContent = '🔄 Fetching zones...';
+      let zoneRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${siteId}`, { headers });
+      let zoneData = await zoneRes.json();
+      document.getElementById('output2').textContent = JSON.stringify(zoneData.list, null, 2);
+
+      // Step 3: Get devices in zone
+      document.getElementById('output3').textContent = '🔄 Fetching devices...';
+      let devRes = await fetch(`https://api-prod.novacene.io/api/v2/devices?page=1&limit=10000&siteid=${siteId}&zoneids=${zoneId}&includeSensors=true&nodeveui=false&nocache=${Date.now()}`, { headers });
+      let devData = await devRes.json();
+      document.getElementById('output3').textContent = JSON.stringify(devData, null, 2);
+
+      // Step 4: Show sensors for devices
+      const summary = [];
+      const devices = devData?.devices || devData?.list || [];
+      const sensorTokens = [];
+
+      if (devices.length === 0) {
+        document.getElementById('output4').textContent = '⚠️ No devices found in this zone.';
+        return;
+      }
+
+      for (let d of devices) {
+        summary.push(`📟 ${d.name} (ID: ${d.id})`);
+        if (Array.isArray(d.sensors)) {
+          for (let s of d.sensors) {
+            sensorTokens.push(s.sensorToken);
+            summary.push(`  - ${s.name} [${s.sensorToken}]`);
+          }
+        } else {
+          summary.push('  ⚠️ No sensors found.');
+        }
+      }
+
+      document.getElementById('output4').textContent = summary.join('\n');
+
+      // Step 5: Fetch sensor history using points-data
+      if (sensorTokens.length === 0) {
+        document.getElementById('output5').textContent = '⚠️ No sensor tokens available for history lookup.';
+        return;
+      }
+
+      document.getElementById('output5').textContent = '🔄 Fetching historical sensor data...';
+
+      let postBody = {
+        sensorTokens: sensorTokens,
+        from: `${from}T00:00:00Z`,
+        to: `${to}T23:59:59Z`,
+        interval: "day"
+      };
 
       try {
-        const res = await fetch(url, { headers });
-        const data = await res.json();
+        const historyRes = await fetch(`https://api-prod.novacene.io/api/v2/devices/points-data`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(postBody)
+        });
 
-        if (!data?.list?.length) {
-          output.textContent = "⚠️ No devices found in Beer Fridge zone.";
-          return;
-        }
-
-        let result = `📦 Found ${data.list.length} device(s) in zone 12651:\n`;
-
-        for (const device of data.list) {
-          result += `\n📟 ${device.name} (ID: ${device.id})\n`;
-          const sensors = device.sensors || [];
-
-          const find = (key) => sensors.find(s => s.name?.toLowerCase().includes(key));
-          const show = (label, key) => {
-            const s = find(key);
-            if (!s) {
-              result += `  • ${label}: ❌ Not Found\n`;
-              return;
-            }
-            const val = s.lastReceivedDataValue;
-            const time = s.lastReceivedDataTime || s.lastReceivedData;
-            const status = getSensorStatus(key, val);
-            result += `  • ${label}: ${val} ${s.unit || ""} at ${time} → ${status}\n`;
-          };
-
-          show("CO₂", "co2");
-          show("Temperature", "temp");
-          show("Humidity", "humid");
-        }
-
-        output.textContent = result;
+        const historyData = await historyRes.json();
+        document.getElementById('output5').textContent = JSON.stringify(historyData, null, 2);
       } catch (err) {
-        output.textContent = "❌ Error: " + err.message;
+        document.getElementById('output5').textContent = '❌ Failed to fetch sensor history. ' + err.message;
       }
     }
   </script>
