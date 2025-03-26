@@ -1,127 +1,83 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Novacene Viewer – Sensor Status</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    h1 { font-size: 28px; }
-    label { display: block; margin-top: 12px; }
-    select, input[type="text"], input[type="datetime-local"] { margin-top: 6px; width: 100%; padding: 6px; }
-    button { margin-top: 10px; padding: 10px; }
-    #output { white-space: pre-wrap; border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
-  </style>
 </head>
 <body>
-  <h1>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h1>
+  <h2>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h2>
 
-  <label for="apiToken">API Token:</label>
-  <input type="text" id="apiToken">
-  <label><input type="checkbox" id="rememberToken"> Remember Key</label>
-  <button onclick="loadSitesAndZones()">Connect and Load Sites & Zones</button>
+  <label>API Token:</label>
+  <input type="text" id="apiToken" style="width: 400px;">
+  <br>
+  <label><input type="checkbox" id="rememberKey"> Remember Key</label>
+  <br><br>
 
-  <div id="selectors" style="display:none">
-    <label for="siteSelect">Select Site:</label>
-    <select id="siteSelect" onchange="loadZones()"></select>
+  <button onclick="connectAndLoad()">Connect and Load Sites & Zones</button>
+  <br><br>
 
-    <label for="zoneSelect">Select Zone:</label>
-    <select id="zoneSelect" onchange="loadDevices()"></select>
+  <label>Site:</label>
+  <select id="siteDropdown" onchange="loadZones()"></select>
 
-    <label for="sensorSelect">Select Sensor:</label>
-    <select id="sensorSelect"></select>
-
-    <label for="startDate">Start Date:</label>
-    <input type="datetime-local" id="startDate">
-
-    <label for="endDate">End Date:</label>
-    <input type="datetime-local" id="endDate">
-
-    <button onclick="fetchSensorData()">Fetch Sensor Data</button>
-  </div>
-
-  <h2>📈 Sensor Data Output:</h2>
-  <div id="output"></div>
+  <label>Zone:</label>
+  <select id="zoneDropdown"></select>
 
   <script>
-    const baseUrl = 'https://platform-api.novacene.io';
+    const apiBase = "https://platform-api.novacene.io";
 
+    // Load saved key if checkbox was previously ticked
     window.onload = () => {
-      const token = localStorage.getItem('apiToken');
-      if (token) {
-        document.getElementById('apiToken').value = token;
-        document.getElementById('rememberToken').checked = true;
+      const savedKey = localStorage.getItem('novacene_api_token');
+      if (savedKey) {
+        document.getElementById('apiToken').value = savedKey;
+        document.getElementById('rememberKey').checked = true;
       }
     };
 
-    function getToken() {
+    function connectAndLoad() {
       const token = document.getElementById('apiToken').value.trim();
-      if (document.getElementById('rememberToken').checked) {
-        localStorage.setItem('apiToken', token);
-      } else {
-        localStorage.removeItem('apiToken');
+
+      if (document.getElementById('rememberKey').checked) {
+        localStorage.setItem('novacene_api_token', token);
       }
-      return token;
-    }
 
-    async function loadSitesAndZones() {
-      const token = getToken();
-      const siteRes = await fetch(`${baseUrl}/sites`, {
+      fetch(`${apiBase}/sites`, {
         headers: { 'api_token': token }
-      });
-      const sites = await siteRes.json();
-
-      const siteSelect = document.getElementById('siteSelect');
-      siteSelect.innerHTML = sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-
-      document.getElementById('selectors').style.display = 'block';
-      loadZones();
-    }
-
-    async function loadZones() {
-      const token = getToken();
-      const siteId = document.getElementById('siteSelect').value;
-      const zoneRes = await fetch(`${baseUrl}/zones?siteids=${siteId}`, {
-        headers: { 'api_token': token }
-      });
-      const zones = await zoneRes.json();
-
-      const zoneSelect = document.getElementById('zoneSelect');
-      zoneSelect.innerHTML = zones.map(z => `<option value="${z.id}">${z.name}</option>`).join('');
-
-      loadDevices();
-    }
-
-    async function loadDevices() {
-      const token = getToken();
-      const zoneId = document.getElementById('zoneSelect').value;
-      const url = `${baseUrl}/devices?zoneids=${zoneId}&limit=100&nodeveui=false&includeSensors=true&nocache=${Date.now()}`;
-      const deviceRes = await fetch(url, {
-        headers: { 'api_token': token }
-      });
-      const devices = await deviceRes.json();
-
-      const sensors = [];
-      devices.forEach(device => {
-        (device.sensors || []).forEach(sensor => {
-          sensors.push({ label: `${device.name} – ${sensor.topic}`, token: sensor.token });
+      })
+      .then(res => res.json())
+      .then(data => {
+        const siteDropdown = document.getElementById('siteDropdown');
+        siteDropdown.innerHTML = '';
+        data.forEach(site => {
+          const option = document.createElement('option');
+          option.value = site.id;
+          option.textContent = site.name;
+          siteDropdown.appendChild(option);
         });
-      });
-
-      const sensorSelect = document.getElementById('sensorSelect');
-      sensorSelect.innerHTML = sensors.map(s => `<option value="${s.token}">${s.label}</option>`).join('');
+        // Load zones for first site automatically
+        loadZones();
+      })
+      .catch(err => alert('Error loading sites: ' + err));
     }
 
-    async function fetchSensorData() {
-      const token = getToken();
-      const sensorToken = document.getElementById('sensorSelect').value;
-      const from = new Date(document.getElementById('startDate').value).toISOString();
-      const to = new Date(document.getElementById('endDate').value).toISOString();
-      const url = `${baseUrl}/values?sensorToken=${sensorToken}&from=${from}&to=${to}`;
-      const res = await fetch(url, { headers: { 'api_token': token } });
-      const data = await res.json();
+    function loadZones() {
+      const token = document.getElementById('apiToken').value.trim();
+      const siteId = document.getElementById('siteDropdown').value;
 
-      document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+      fetch(`${apiBase}/zones?siteids=${siteId}`, {
+        headers: { 'api_token': token }
+      })
+      .then(res => res.json())
+      .then(data => {
+        const zoneDropdown = document.getElementById('zoneDropdown');
+        zoneDropdown.innerHTML = '';
+        data.forEach(zone => {
+          const option = document.createElement('option');
+          option.value = zone.id;
+          option.textContent = zone.name;
+          zoneDropdown.appendChild(option);
+        });
+      })
+      .catch(err => alert('Error loading zones: ' + err));
     }
   </script>
 </body>
