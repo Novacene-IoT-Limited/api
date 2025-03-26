@@ -4,10 +4,27 @@
   <meta charset="UTF-8" />
   <title>Novacene Viewer</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    label { display: block; margin-top: 10px; }
-    input, select, button { margin-top: 5px; width: 100%; max-width: 300px; }
-    pre { background: #f4f4f4; padding: 10px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+    input, select, button {
+      margin-top: 5px;
+      width: 100%;
+      max-width: 300px;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 10px;
+    }
+    #messages {
+      margin-top: 10px;
+      color: red;
+    }
   </style>
 </head>
 <body>
@@ -25,19 +42,33 @@
   <select id="zonesDropdown"></select>
 
   <button id="loadSensorsBtn">Load Sensors</button>
+
+  <div id="messages"></div>
   <div id="sensorData"></div>
 
   <script>
+    // Clear any messages and data
+    function clearOutput() {
+      document.getElementById('messages').textContent = '';
+      document.getElementById('sensorData').innerHTML = '';
+    }
+
     async function loadSites() {
-      const token = document.getElementById('apiToken').value;
-      if (!token) return alert("Enter an API token.");
+      clearOutput();
+      const token = document.getElementById('apiToken').value.trim();
+      if (!token) {
+        document.getElementById('messages').textContent = 'Please enter a valid API token.';
+        return;
+      }
       try {
         const res = await fetch('https://platform-api.novacene.io/sites', {
-     headers: {
-  'Authorization': `Bearer ${apiToken}`
-}
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
-        if (!res.ok) throw new Error('Failed to load sites');
+        if (!res.ok) {
+          throw new Error('Failed to load sites');
+        }
         const sites = await res.json();
         const dropdown = document.getElementById('sitesDropdown');
         dropdown.innerHTML = '';
@@ -48,19 +79,27 @@
           dropdown.appendChild(opt);
         });
       } catch (e) {
-        alert(e.message);
+        document.getElementById('messages').textContent = e.message;
       }
     }
 
     async function loadZones() {
-      const token = document.getElementById('apiToken').value;
+      clearOutput();
+      const token = document.getElementById('apiToken').value.trim();
       const siteId = document.getElementById('sitesDropdown').value;
-      if (!token || !siteId) return alert("Select a site first.");
+      if (!token || !siteId) {
+        document.getElementById('messages').textContent = 'Please load sites and select one first.';
+        return;
+      }
       try {
         const res = await fetch(`https://platform-api.novacene.io/zones?siteid=${siteId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
-        if (!res.ok) throw new Error('Failed to load zones');
+        if (!res.ok) {
+          throw new Error('Failed to load zones');
+        }
         const zones = await res.json();
         const dropdown = document.getElementById('zonesDropdown');
         dropdown.innerHTML = '';
@@ -71,23 +110,31 @@
           dropdown.appendChild(opt);
         });
       } catch (e) {
-        alert(e.message);
+        document.getElementById('messages').textContent = e.message;
       }
     }
 
     async function loadSensors() {
-      const token = document.getElementById('apiToken').value;
+      clearOutput();
+      const token = document.getElementById('apiToken').value.trim();
       const zoneId = document.getElementById('zonesDropdown').value;
-      if (!token || !zoneId) return alert("Select a zone first.");
+      if (!token || !zoneId) {
+        document.getElementById('messages').textContent = 'Please load zones and select one first.';
+        return;
+      }
       try {
         const res = await fetch(`https://platform-api.novacene.io/sensors?zoneid=${zoneId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
-        if (!res.ok) throw new Error('Failed to load sensors');
+        if (!res.ok) {
+          throw new Error('Failed to load sensors');
+        }
         const sensors = await res.json();
         document.getElementById('sensorData').innerHTML = `<pre>${JSON.stringify(sensors, null, 2)}</pre>`;
       } catch (e) {
-        alert(e.message);
+        document.getElementById('messages').textContent = e.message;
       }
     }
 
