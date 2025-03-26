@@ -1,79 +1,56 @@
-Novacene Dashboard
-54
-55
-56
-57
-58
-59
-60
-61
-62
-63
-64
-65
-66
-67
-68
-69
-70
-71
-72
-73
-74
-75
-76
-77
-78
-79
-80
-81
-82
-83
-84
-85
-86
-87
-88
-89
-90
-91
-92
-93
-94
-95
-96
-97
-98
-99
-100
-101
-102
-103
-104
-105
-106
-107
-108
-109
-110
-111
-112
-113
-114
-115
-116
-117
-118
-119
-120
-121
-122
-123
-124
-125
-126
-127
-128
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Novacene Viewer – Sensor Status</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h1 { font-size: 28px; }
+    label { display: block; margin-top: 12px; }
+    select, input[type="text"], input[type="datetime-local"] { margin-top: 6px; width: 100%; padding: 6px; }
+    button { margin-top: 10px; padding: 10px; }
+    #output { white-space: pre-wrap; border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h1>
+
+  <label for="apiToken">API Token:</label>
+  <input type="text" id="apiToken">
+  <label><input type="checkbox" id="rememberToken"> Remember Key</label>
+  <button onclick="loadSitesAndZones()">Connect and Load Sites & Zones</button>
+
+  <div id="selectors" style="display:none">
+    <label for="siteSelect">Select Site:</label>
+    <select id="siteSelect" onchange="loadZones()"></select>
+
+    <label for="zoneSelect">Select Zone:</label>
+    <select id="zoneSelect" onchange="loadDevices()"></select>
+
+    <label for="sensorSelect">Select Sensor:</label>
+    <select id="sensorSelect"></select>
+
+    <label for="startDate">Start Date:</label>
+    <input type="datetime-local" id="startDate">
+
+    <label for="endDate">End Date:</label>
+    <input type="datetime-local" id="endDate">
+
+    <button onclick="fetchSensorData()">Fetch Sensor Data</button>
+  </div>
+
+  <h2>📈 Sensor Data Output:</h2>
+  <div id="output"></div>
+
+  <script>
+    const baseUrl = 'https://platform-api.novacene.io';
+
+    window.onload = () => {
+      const token = localStorage.getItem('apiToken');
+      if (token) {
+        document.getElementById('apiToken').value = token;
+        document.getElementById('rememberToken').checked = true;
       }
     };
 
@@ -149,4 +126,3 @@ Novacene Dashboard
   </script>
 </body>
 </html>
-
