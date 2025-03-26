@@ -93,7 +93,12 @@
 
         let outputText = `📍 Zones:\n${renderZoneTree(rootZones)}\n\n📡 Devices:\n`;
         const dateList = getDateList(start, end);
-
+if (!devices?.list?.length) {
+  outputText += `⚠️ No devices found in site ${siteId}.\n\n`;
+  console.warn("⚠️ devices.list is empty or undefined");
+  output.textContent = outputText;
+  return;
+}
         for (const d of devices.list || []) {
           outputText += `- Name: ${d.name || "Unnamed"}\n`;
           outputText += `  ID: ${d.id}\n`;
