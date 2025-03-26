@@ -11,7 +11,7 @@
   </style>
 </head>
 <body>
-  <h1>📡 Novacene API Viewer – Project 145</h1>
+  <h1>📡 Novacene Viewer – All Sites in Project 145</h1>
 
   <label><strong>API Token:</strong></label><br>
   <input type="text" id="apiToken" placeholder="Paste your API key here"><br>
@@ -61,15 +61,15 @@
       const output = document.getElementById('output');
       const headers = { 'api_token': token };
       const dateList = getDateList(start, end);
-
       let outputText = `📦 Project ID: ${projectId}\n\n`;
 
       try {
+        // Fetch all sites in this project
         const sitesRes = await fetch(`https://api-prod.novacene.io/api/v2/sites?projectid=${projectId}`, { headers });
         const sites = await sitesRes.json();
 
         if (!sites?.list?.length) {
-          outputText += `⚠️ No sites found.\n`;
+          outputText += `⚠️ No sites found for this project.\n`;
           output.textContent = outputText;
           return;
         }
@@ -77,6 +77,7 @@
         for (const site of sites.list) {
           outputText += `🏢 Site: ${site.name} (ID: ${site.id})\n`;
 
+          // Fetch zones
           const zonesRes = await fetch(`https://api-prod.novacene.io/api/v2/zones?siteid=${site.id}`, { headers });
           const zones = await zonesRes.json();
           outputText += `  🌐 Zones (${zones.list?.length || 0}):\n`;
@@ -84,11 +85,15 @@
             outputText += `    - ${z.name} (ID: ${z.id}, Devices: ${z.devices})\n`;
           });
 
-          const devicesRes = await fetch(`https://api-prod.novacene.io/api/v2/devices?siteid=${site.id}&isRemoved=true`, { headers });
+          // Fetch devices
+          const devicesRes = await fetch(
+            `https://api-prod.novacene.io/api/v2/devices?siteid=${site.id}&isRemoved=true`,
+            { headers }
+          );
           const devices = await devicesRes.json();
 
           if (!devices?.list?.length) {
-            outputText += `  ⚠️ No devices found.\n`;
+            outputText += `  ⚠️ No devices found in this site.\n`;
             continue;
           }
 
@@ -102,9 +107,10 @@
               continue;
             }
 
-            outputText += `    Active Sensors (${sensorIds.length}):\n`;
+            outputText += `    Active Sensors:\n`;
             for (const sensorId of sensorIds) {
               outputText += `      Sensor ID: ${sensorId}\n`;
+
               for (const day of dateList) {
                 const url = `https://api-prod.novacene.io/api/v2/devices/points-data?siteid=${site.id}&sensor=${sensorId}&start=${day}&end=${day}`;
                 try {
