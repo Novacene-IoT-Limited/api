@@ -1,158 +1,152 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>📡 Novacene Viewer – Sensor Status</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    label, select, input {
-      margin: 8px 0;
-    }
-    select, input[type="text"], input[type="datetime-local"] {
-      padding: 5px;
-      width: 300px;
-    }
-    button {
-      margin: 10px 0;
-      padding: 6px 12px;
-    }
-    textarea {
-      width: 100%;
-      height: 300px;
-    }
-  </style>
-</head>
-<body>
-  <h2>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h2>
-
-  <label>API Token: <input type="text" id="apiToken" /></label><br />
-  <label><input type="checkbox" id="rememberKey" /> Remember Key</label><br />
-  <button onclick="fetchProjectsAndSites()">Connect and Load Sites & Zones</button>
-
-  <br /><br />
-  <label>Site: <select id="siteSelect"></select></label><br />
-  <label>Zone: <select id="zoneSelect"></select></label><br />
-  <button onclick="fetchDevicesAndSensors()">Fetch Devices & Sensors</button>
-
-  <div id="deviceSensorList"></div>
-
-  <h3>📊 Available Sensors:</h3>
-  <label>Select Sensor:
-    <select id="sensorSelect"></select>
-  </label><br />
-  <label>Start Date: <input type="datetime-local" id="startDate" /></label>
-  <label>End Date: <input type="datetime-local" id="endDate" /></label>
-  <button onclick="fetchSensorData()">Fetch Sensor Data</button>
-
-  <h3>📈 Sensor Data Output:</h3>
-  <textarea id="sensorDataOutput"></textarea>
-
-  <script>
-    const apiDomain = "https://app.novacene.io/api";
-
-    if (localStorage.getItem("apiToken")) {
-      document.getElementById("apiToken").value = localStorage.getItem("apiToken");
-      document.getElementById("rememberKey").checked = true;
-    }
+Novacene Dashboard
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+      }
+    };
 
     function getToken() {
-      return document.getElementById("apiToken").value;
-    }
-
-    async function fetchProjectsAndSites() {
-      const token = getToken();
-      if (!token) return alert("API Token required");
-      if (document.getElementById("rememberKey").checked) {
-        localStorage.setItem("apiToken", token);
+      const token = document.getElementById('apiToken').value.trim();
+      if (document.getElementById('rememberToken').checked) {
+        localStorage.setItem('apiToken', token);
+      } else {
+        localStorage.removeItem('apiToken');
       }
-
-      const siteSelect = document.getElementById("siteSelect");
-      siteSelect.innerHTML = "";
-
-      const res = await fetch(`${apiDomain}/site`, {
-        headers: { "api_token": token }
-      });
-      const data = await res.json();
-
-      data.sites.forEach(site => {
-        const option = document.createElement("option");
-        option.value = site.id;
-        option.text = `${site.name} (ID: ${site.id})`;
-        siteSelect.appendChild(option);
-      });
-
-      siteSelect.onchange = fetchZones;
-      fetchZones();
+      return token;
     }
 
-    async function fetchZones() {
-      const siteId = document.getElementById("siteSelect").value;
+    async function loadSitesAndZones() {
       const token = getToken();
-      const res = await fetch(`${apiDomain}/zones?siteids=${siteId}`, {
-        headers: { "api_token": token }
+      const siteRes = await fetch(`${baseUrl}/sites`, {
+        headers: { 'api_token': token }
       });
-      const data = await res.json();
+      const sites = await siteRes.json();
 
-      const zoneSelect = document.getElementById("zoneSelect");
-      zoneSelect.innerHTML = "";
-      data.zones.forEach(zone => {
-        const option = document.createElement("option");
-        option.value = zone.id;
-        option.text = `${zone.name} (ID: ${zone.id})`;
-        zoneSelect.appendChild(option);
-      });
+      const siteSelect = document.getElementById('siteSelect');
+      siteSelect.innerHTML = sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+      document.getElementById('selectors').style.display = 'block';
+      loadZones();
     }
 
-    async function fetchDevicesAndSensors() {
-      const zoneId = document.getElementById("zoneSelect").value;
+    async function loadZones() {
       const token = getToken();
-      const res = await fetch(`${apiDomain}/devices?zoneids=${zoneId}&limit=100&nodeveui=false&includeSensors=true&nocache=${Date.now()}`, {
-        headers: { "api_token": token }
+      const siteId = document.getElementById('siteSelect').value;
+      const zoneRes = await fetch(`${baseUrl}/zones?siteids=${siteId}`, {
+        headers: { 'api_token': token }
       });
-      const data = await res.json();
+      const zones = await zoneRes.json();
 
-      const deviceDiv = document.getElementById("deviceSensorList");
-      const sensorSelect = document.getElementById("sensorSelect");
-      deviceDiv.innerHTML = "";
-      sensorSelect.innerHTML = "";
+      const zoneSelect = document.getElementById('zoneSelect');
+      zoneSelect.innerHTML = zones.map(z => `<option value="${z.id}">${z.name}</option>`).join('');
 
-      data.devices.forEach(device => {
-        const header = document.createElement("h4");
-        header.textContent = `📟 ${device.name} (ID: ${device.id})`;
-        deviceDiv.appendChild(header);
+      loadDevices();
+    }
 
-        device.sensors.forEach(sensor => {
-          const item = document.createElement("div");
-          item.textContent = `🔹 ${sensor.topic}: ${sensor.last_value} @ ${sensor.last_received}`;
-          deviceDiv.appendChild(item);
+    async function loadDevices() {
+      const token = getToken();
+      const zoneId = document.getElementById('zoneSelect').value;
+      const url = `${baseUrl}/devices?zoneids=${zoneId}&limit=100&nodeveui=false&includeSensors=true&nocache=${Date.now()}`;
+      const deviceRes = await fetch(url, {
+        headers: { 'api_token': token }
+      });
+      const devices = await deviceRes.json();
 
-          const option = document.createElement("option");
-          option.value = sensor.topic;
-          option.text = `${device.name} – ${sensor.topic}`;
-          sensorSelect.appendChild(option);
+      const sensors = [];
+      devices.forEach(device => {
+        (device.sensors || []).forEach(sensor => {
+          sensors.push({ label: `${device.name} – ${sensor.topic}`, token: sensor.token });
         });
       });
+
+      const sensorSelect = document.getElementById('sensorSelect');
+      sensorSelect.innerHTML = sensors.map(s => `<option value="${s.token}">${s.label}</option>`).join('');
     }
 
     async function fetchSensorData() {
-      const topic = document.getElementById("sensorSelect").value;
-      const start = new Date(document.getElementById("startDate").value).toISOString();
-      const end = new Date(document.getElementById("endDate").value).toISOString();
       const token = getToken();
-      if (!topic || !start || !end) return alert("All fields are required");
-
-      const res = await fetch(`${apiDomain}/sensordata?topic=${encodeURIComponent(topic)}&start=${start}&end=${end}`, {
-        headers: { "api_token": token }
-      });
-
+      const sensorToken = document.getElementById('sensorSelect').value;
+      const from = new Date(document.getElementById('startDate').value).toISOString();
+      const to = new Date(document.getElementById('endDate').value).toISOString();
+      const url = `${baseUrl}/values?sensorToken=${sensorToken}&from=${from}&to=${to}`;
+      const res = await fetch(url, { headers: { 'api_token': token } });
       const data = await res.json();
-      const output = document.getElementById("sensorDataOutput");
-      output.value = JSON.stringify(data, null, 2);
+
+      document.getElementById('output').textContent = JSON.stringify(data, null, 2);
     }
   </script>
 </body>
 </html>
+
