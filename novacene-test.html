@@ -12,16 +12,19 @@
 </head>
 <body>
 
-<h2>📡 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h2>
+<h2>📱 Novacene Viewer – Sensor Status (CO₂, Temp, Humidity)</h2>
 
 <label>API Token:</label><br/>
-<input type="text" id="apiToken" placeholder="Your API token"/><br/>
+<input type="text" id="apiToken" value="YOUR_DEFAULT_API_TOKEN_HERE"/><br/>
 
-<label>Site ID:</label><br/>
-<input type="text" id="siteId" placeholder="e.g. 471"/><br/>
+<label>Project ID:</label><br/>
+<input type="text" id="projectId" value="YOUR_DEFAULT_PROJECT_ID_HERE"/><br/>
 
-<label>Zone ID:</label><br/>
-<input type="text" id="zoneId" placeholder="e.g. 12651"/><br/>
+<label>Site:</label><br/>
+<select id="siteSelect"></select><br/>
+
+<label>Zone:</label><br/>
+<select id="zoneSelect"></select><br/>
 
 <button onclick="fetchDevices()">Fetch Devices & Sensors</button>
 
@@ -43,25 +46,55 @@
 <script>
 let sensors = [];
 
+async function fetchSitesAndZones() {
+  const token = document.getElementById("apiToken").value;
+  const projectId = document.getElementById("projectId").value;
+  const siteRes = await fetch(`https://api.novacene.io/api/sites?projectid=${projectId}`, {
+    headers: { "api_token": token }
+  });
+  const siteData = await siteRes.json();
+
+  const siteSelect = document.getElementById("siteSelect");
+  siteSelect.innerHTML = "";
+  siteData.data.forEach(site => {
+    const opt = document.createElement("option");
+    opt.value = site.id;
+    opt.textContent = site.name;
+    siteSelect.appendChild(opt);
+  });
+
+  siteSelect.addEventListener("change", fetchZones);
+  fetchZones();
+}
+
+async function fetchZones() {
+  const token = document.getElementById("apiToken").value;
+  const siteId = document.getElementById("siteSelect").value;
+  const zoneRes = await fetch(`https://api.novacene.io/api/zones?siteid=${siteId}`, {
+    headers: { "api_token": token }
+  });
+  const zoneData = await zoneRes.json();
+
+  const zoneSelect = document.getElementById("zoneSelect");
+  zoneSelect.innerHTML = "";
+  zoneData.data.forEach(zone => {
+    const opt = document.createElement("option");
+    opt.value = zone.id;
+    opt.textContent = zone.name;
+    zoneSelect.appendChild(opt);
+  });
+}
+
 async function fetchDevices() {
   const token = document.getElementById("apiToken").value;
-  const zoneId = document.getElementById("zoneId").value;
-
+  const zoneId = document.getElementById("zoneSelect").value;
   const url = `https://api.novacene.io/api/devices?zoneids=${zoneId}&limit=100&nodeveui=false&includeSensors=true&nocache=${Date.now()}`;
   const res = await fetch(url, {
     headers: { "api_token": token }
   });
-
   const data = await res.json();
-  console.log("Fetched device data:", data);
-
-  if (!data.success) {
-    alert("Error fetching devices: " + JSON.stringify(data));
-    return;
-  }
 
   sensors = [];
-
   const select = document.getElementById("sensorSelect");
   select.innerHTML = "";
 
@@ -74,8 +107,6 @@ async function fetchDevices() {
       select.appendChild(opt);
     });
   });
-
-  console.log("Loaded sensors:", sensors);
 }
 
 async function fetchSensorData() {
@@ -92,18 +123,13 @@ async function fetchSensorData() {
 
   const start = startRaw + ":00Z";
   const end = endRaw + ":00Z";
-
   const url = `https://api.novacene.io/api/sensordata?token=${encodeURIComponent(sensorToken)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&limit=1000`;
-
-  console.log("Sensor data URL:", url);
 
   try {
     const res = await fetch(url, {
       headers: { "api_token": token }
     });
-
     const data = await res.json();
-    console.log("Sensor data response:", data);
 
     if (!data.success) {
       output.value = "❌ API Error:\n" + JSON.stringify(data, null, 2);
@@ -115,15 +141,16 @@ async function fetchSensorData() {
       return;
     }
 
-    const rows = data.data.values.map(entry =>
-      `${entry.timestamp} → ${entry.value}`
-    );
-
+    const rows = data.data.values.map(entry => `${entry.timestamp} → ${entry.value}`);
     output.value = rows.join("\n");
   } catch (err) {
     output.value = "❌ Fetch error:\n" + err.message;
   }
 }
+
+// Trigger initial site/zone loading
+fetchSitesAndZones();
 </script>
+
 </body>
 </html>
