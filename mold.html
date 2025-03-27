@@ -2,311 +2,211 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Mould Risk Dashboard (Exact Column Names)</title>
-  <!-- Chart.js for graphs -->
+  <title>Mould Risk Scatter Chart</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- pdfmake for PDF export -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfmake/build/pdfmake.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pdfmake/build/vfs_fonts.js"></script>
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; }
-    header { background: #f2f2f2; padding: 1rem; }
-    .cards { display: flex; gap: 1rem; margin: 1rem; }
-    .card { background: #fff; padding: 1rem; border: 1px solid #ddd; flex: 1; text-align: center; }
-    h2 { margin: 0.5rem 0; }
-    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
-    th, td { padding: 0.5rem; border: 1px solid #ccc; text-align: left; }
-    .btns { margin: 1rem; }
-    .btns button { margin-right: 0.5rem; padding: 0.5rem 1rem; }
-    #chartContainer { margin: 1rem; }
+    body {
+      margin: 0; padding: 0;
+      font-family: sans-serif;
+    }
+    header {
+      background: #f2f2f2; padding: 1rem;
+      border-bottom: 1px solid #ccc;
+    }
+    h1 { margin: 0; }
+    .container {
+      max-width: 900px;
+      margin: 1rem auto; padding: 1rem;
+    }
+    canvas {
+      width: 100%; height: 400px;
+    }
+    .legend {
+      display: flex; gap: 1rem; margin-top: 0.5rem;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 0.25rem;
+    }
+    .legend-color {
+      width: 1rem; height: 1rem; border-radius: 50%;
+    }
+    .legend-color.green { background: green; }
+    .legend-color.amber { background: orange; }
+    .legend-color.red   { background: red; }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>Mould Risk Dashboard</h1>
+  <h1>Damp & Mould Risk at a Glance</h1>
 </header>
 
-<!-- Top-level summary cards -->
-<div class="cards">
-  <div class="card">
-    <h2>Records Found</h2>
-    <p id="recordsCount">0</p>
+<div class="container">
+  <canvas id="scatterChart"></canvas>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-color green"></div> Normal</div>
+    <div class="legend-item"><div class="legend-color amber"></div> Caution</div>
+    <div class="legend-item"><div class="legend-color red"></div> High Risk</div>
   </div>
-  <div class="card">
-    <h2>High-RH Readings</h2>
-    <p id="highRhCount">0</p>
-  </div>
-</div>
-
-<!-- Data table -->
-<div style="margin: 1rem;">
-  <table>
-    <thead>
-      <tr>
-        <th>Timestamp</th>
-        <th>Temperature (°C)</th>
-        <th>Humidity (%)</th>
-        <th>Risk Status</th>
-      </tr>
-    </thead>
-    <tbody id="zoneTableBody">
-      <!-- Populated dynamically from CSV -->
-    </tbody>
-  </table>
-</div>
-
-<!-- Chart container -->
-<div id="chartContainer">
-  <canvas id="rhChart"></canvas>
-</div>
-
-<!-- Buttons for exporting -->
-<div class="btns">
-  <button id="downloadCsv">Export CSV</button>
-  <button id="downloadPdf">Export PDF</button>
 </div>
 
 <script>
-// -----------------------------------------------------------------------
-// 1) Your published Google Sheet CSV link (unchanged from your question):
-// -----------------------------------------------------------------------
-const GOOGLE_SHEET_CSV_URL =
-  'https://docs.google.com/spreadsheets/d/e/2PACX-1vTtyaaD9UIdtuhO9BW1q6Mb4-26_jsidDU73HB1DE4Y8FE1tKSQxIAkLasrc3bT-0mvDy4ejjgTPJm1/pub?gid=0&single=true&output=csv';
+// ----------------------------------------------------------------------
+// 1) URL to your 24-hour CSV (the one with 144 rows) 
+//    e.g. "mold_risk_24hr.csv" if hosted locally or a published link 
+//    If you have a Google Sheets CSV link, place that URL here:
+const CSV_URL = 'mold_risk_24hr.csv';
 
-// -----------------------------------------------------------------------
-// 2) EXACT column names from your sheet (replace with your actual humidity col):
-//    The user mentioned the temperature column is named:
-//    "Temp Board - Elsys Co2 004 / temperature - A81758FFFE0CA9A1 - Temp Board"
-//    If your humidity column is similarly named, provide it below:
-// -----------------------------------------------------------------------
-const EXACT_TIMESTAMP_HEADER = 'timestamp'; // Adjust if your sheet has a different name
-const EXACT_TEMPERATURE_HEADER = 'Temp Board - Elsys Co2 004 / temperature - A81758FFFE0CA9A1 - Temp Board';
-// Example guess for humidity column name:
-const EXACT_HUMIDITY_HEADER = 'Temp Board - Elsys Co2 004 / humidity - A81758FFFE0CA9A1 - Temp Board';
-// If your actual humidity column name is different, put it here.
+// 2) Column names we’ll parse from the CSV
+//    - "Timestamp" (x-axis label)
+//    - "Temp_004" (plotted on y-axis) - adjust if you want a different sensor
+//    - "RH_004"   (to determine color) 
+const TIMESTAMP_COL = 'Timestamp';
+const TEMPERATURE_COL = 'Temp_004';
+const HUMIDITY_COL = 'RH_004';
 
-let tableData = []; // array of { timestamp, temperature, humidity, riskStatus }
+// 3) Threshold logic for humidity => color
+function getColorByHumidity(hum) {
+  if (hum < 60) return 'green';
+  if (hum < 70) return 'orange';
+  return 'red';
+}
 
-// 3) FETCH the CSV
-fetch(GOOGLE_SHEET_CSV_URL)
+// 4) Parse the date/time from CSV. We'll store as a JS date for the x-axis.
+function parseTimestamp(tsString) {
+  // e.g. "2025-03-26 00:00"
+  // Return a Date object
+  return new Date(tsString.replace(' ', 'T')); 
+  // Alternatively, adjust if needed for your local time zone
+}
+
+// We'll store the data points in an array
+let chartDataPoints = [];
+
+// Fetch the CSV
+fetch(CSV_URL)
   .then(response => response.text())
   .then(csv => {
     parseCsv(csv);
-    updateDashboard();
-    buildTable();
     buildChart();
   })
-  .catch(err => console.error('Error fetching CSV:', err));
+  .catch(err => console.error('Error loading CSV:', err));
 
-// 4) PARSE the CSV
+// Parse CSV
 function parseCsv(csv) {
-  const lines = csv.split('\\n').filter(line => line.trim().length > 0);
+  const lines = csv.split('\n').filter(line => line.trim() !== '');
   if (!lines.length) return;
 
-  // Parse headers
   const headers = lines[0].split(',');
+  // Identify column indices
+  const tsIndex = headers.indexOf(TIMESTAMP_COL);
+  const tempIndex = headers.indexOf(TEMPERATURE_COL);
+  const humIndex = headers.indexOf(HUMIDITY_COL);
 
-  // Find the index of each column
-  const tsIndex = headers.indexOf(EXACT_TIMESTAMP_HEADER);
-  const tempIndex = headers.indexOf(EXACT_TEMPERATURE_HEADER);
-  const humIndex = headers.indexOf(EXACT_HUMIDITY_HEADER);
-
-  if (tsIndex === -1) {
-    console.warn('Could not find timestamp column:', EXACT_TIMESTAMP_HEADER);
-  }
-  if (tempIndex === -1) {
-    console.warn('Could not find temperature column:', EXACT_TEMPERATURE_HEADER);
-  }
-  if (humIndex === -1) {
-    console.warn('Could not find humidity column:', EXACT_HUMIDITY_HEADER);
+  if (tsIndex === -1 || tempIndex === -1 || humIndex === -1) {
+    console.warn('Check your CSV headers. Could not find the needed columns.');
+    return;
   }
 
-  // For each subsequent line
+  // For each data row
   for (let i = 1; i < lines.length; i++) {
     const row = lines[i].split(',');
-    // skip if row doesn't match number of columns
     if (row.length < headers.length) continue;
 
-    // Extract data (or mark as null if not found)
-    const tsVal = tsIndex > -1 ? row[tsIndex] : '';
-    const tempValRaw = tempIndex > -1 ? row[tempIndex] : '';
-    const humValRaw = humIndex > -1 ? row[humIndex] : '';
+    const tsStr = row[tsIndex];
+    const tempStr = row[tempIndex];
+    const humStr = row[humIndex];
 
-    const temperature = parseFloat(tempValRaw);
-    const humidity = parseFloat(humValRaw);
+    const tempVal = parseFloat(tempStr);
+    const humVal = parseFloat(humStr);
 
-    // Simple risk logic: if humidity > 70 => High, between 60-70 => Medium, else Low
-    let riskStatus = 'Low';
-    if (!isNaN(humidity)) {
-      if (humidity >= 70) {
-        riskStatus = 'High';
-      } else if (humidity >= 60) {
-        riskStatus = 'Medium';
-      }
-    }
+    if (isNaN(tempVal) || isNaN(humVal)) continue;
 
-    tableData.push({
-      timestamp: tsVal,
-      temperature: !isNaN(temperature) ? temperature : null,
-      humidity: !isNaN(humidity) ? humidity : null,
-      riskStatus
+    const dateObj = parseTimestamp(tsStr);
+
+    // We'll create a scatter point with x=Date, y=Temperature
+    // color depends on humidity
+    chartDataPoints.push({
+      x: dateObj,
+      y: tempVal,
+      humidity: humVal
     });
   }
 }
 
-// 5) UPDATE DASHBOARD COUNTERS
-function updateDashboard() {
-  document.getElementById('recordsCount').innerText = tableData.length;
-
-  // Count how many entries are "High"
-  let highCount = 0;
-  tableData.forEach(d => {
-    if (d.riskStatus === 'High') {
-      highCount++;
-    }
-  });
-  document.getElementById('highRhCount').innerText = highCount;
-}
-
-// 6) BUILD THE TABLE
-function buildTable() {
-  const tbody = document.getElementById('zoneTableBody');
-  tbody.innerHTML = '';
-
-  tableData.forEach(item => {
-    const tr = document.createElement('tr');
-
-    const tdTime = document.createElement('td');
-    tdTime.textContent = item.timestamp;
-    tr.appendChild(tdTime);
-
-    const tdTemp = document.createElement('td');
-    tdTemp.textContent = item.temperature !== null ? item.temperature.toFixed(1) : 'N/A';
-    tr.appendChild(tdTemp);
-
-    const tdHum = document.createElement('td');
-    tdHum.textContent = item.humidity !== null ? item.humidity.toFixed(1) : 'N/A';
-    tr.appendChild(tdHum);
-
-    const tdRisk = document.createElement('td');
-    tdRisk.textContent = item.riskStatus;
-    tr.appendChild(tdRisk);
-
-    tbody.appendChild(tr);
-  });
-}
-
-// 7) BUILD THE CHART
+// Build Chart
 function buildChart() {
-  const ctx = document.getElementById('rhChart').getContext('2d');
+  const ctx = document.getElementById('scatterChart').getContext('2d');
 
-  // We'll label each entry by its timestamp (be careful if you have thousands of data points).
-  const labels = tableData.map(d => d.timestamp);
-
-  // Temperature line
-  const tempValues = tableData.map(d => d.temperature);
-  // Humidity bar
-  const humValues = tableData.map(d => d.humidity);
+  // We'll create a single dataset for the scatter,
+  // coloring each point individually based on humidity
+  const scatterData = chartDataPoints.map(point => {
+    return {
+      x: point.x,        // Date object for time scale
+      y: point.y,        // Temperature
+      backgroundColor: getColorByHumidity(point.humidity),
+      radius: 4          // size of the dot
+    };
+  });
 
   new Chart(ctx, {
+    type: 'scatter',
     data: {
-      labels: labels,
       datasets: [
         {
-          type: 'line',
-          label: 'Temperature (°C)',
-          data: tempValues,
-          borderColor: 'blue',
-          backgroundColor: 'blue',
-          yAxisID: 'y'
-        },
-        {
-          type: 'bar',
-          label: 'Humidity (%)',
-          data: humValues,
-          backgroundColor: function(context) {
-            const val = context.parsed.y;
-            if (isNaN(val)) return 'grey';
-            if (val < 60) return 'green';
-            if (val < 70) return 'orange';
-            return 'red';
-          },
-          yAxisID: 'y1'
+          label: 'Temperature',
+          data: scatterData,
+          parsing: false,  // we'll supply {x, y} directly
+          pointBackgroundColor: scatterData.map(d => d.backgroundColor),
+          showLine: false
         }
       ]
     },
     options: {
+      responsive: true,
       scales: {
-        y: {
-          type: 'linear',
-          position: 'left',
-          title: { display: true, text: 'Temperature (°C)' }
+        x: {
+          type: 'time',
+          time: {
+            displayFormats: {
+              hour: 'HH:mm'
+            },
+            tooltipFormat: 'EEE, dd MMM HH:mm'
+          },
+          title: {
+            display: true,
+            text: 'Time'
+          }
         },
-        y1: {
-          type: 'linear',
-          position: 'right',
-          title: { display: true, text: 'Humidity (%)' }
+        y: {
+          beginAtZero: false,
+          title: {
+            display: true,
+            text: 'Temperature (°C)'
+          },
+          suggestedMin: 5,  // adjust if you want lower bound 
+          suggestedMax: 25  // or higher if data goes beyond 25
         }
       },
-      responsive: true
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const raw = context.raw;
+              const tempVal = raw.y;
+              // We stored the backgroundColor on the raw as well,
+              // but for humidity we need to cross-reference chartDataPoints
+              // The easiest way is to find the matching point:
+              const match = chartDataPoints[context.dataIndex];
+              const hum = match?.humidity ?? 'N/A';
+              return `Temp: ${tempVal} °C, RH: ${hum}%`;
+            }
+          }
+        }
+      }
     }
   });
 }
-
-// 8) EXPORT CSV
-document.getElementById('downloadCsv').addEventListener('click', () => {
-  const rows = [['Timestamp','Temperature','Humidity','Risk Status']];
-  tableData.forEach(item => {
-    rows.push([
-      item.timestamp,
-      item.temperature !== null ? String(item.temperature.toFixed(1)) : 'N/A',
-      item.humidity !== null ? String(item.humidity.toFixed(1)) : 'N/A',
-      item.riskStatus
-    ]);
-  });
-  let csvContent = '';
-  rows.forEach(row => {
-    csvContent += row.join(',') + '\\n';
-  });
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', 'DashboardData.csv');
-  link.click();
-});
-
-// 9) EXPORT PDF
-document.getElementById('downloadPdf').addEventListener('click', () => {
-  const bodyRows = [
-    ['Timestamp','Temperature','Humidity','Risk Status']
-  ];
-  tableData.forEach(item => {
-    bodyRows.push([
-      item.timestamp,
-      item.temperature !== null ? item.temperature.toFixed(1) : 'N/A',
-      item.humidity !== null ? item.humidity.toFixed(1) : 'N/A',
-      item.riskStatus
-    ]);
-  });
-
-  const docDefinition = {
-    content: [
-      { text: 'Mould Risk Report', style: 'header' },
-      '',
-      {
-        table: {
-          body: bodyRows
-        }
-      }
-    ],
-    styles: {
-      header: { fontSize: 16, bold: true }
-    }
-  };
-  pdfMake.createPdf(docDefinition).download('DashboardReport.pdf');
-});
 </script>
 
 </body>
