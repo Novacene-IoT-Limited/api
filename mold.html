@@ -202,4 +202,111 @@ function buildChart() {
   tempData = tableData.map(d => d.temperature);
   rhData = tableData.map(d => d.humidity);
 
-  const ctx = document.get
+  const ctx = document.getElementById('rhChart').getContext('2d');
+  const data = {
+    labels: chartLabels,
+    datasets: [
+      {
+        type: 'line',
+        label: 'Temperature (°C)',
+        data: tempData,
+        borderColor: 'blue',
+        yAxisID: 'y'
+      },
+      {
+        type: 'bar',
+        label: 'Humidity (%)',
+        data: rhData,
+        backgroundColor: function(ctx) {
+          const val = ctx.parsed.y;
+          if (val < 60) return 'green';
+          if (val < 70) return 'orange';
+          return 'red';
+        },
+        yAxisID: 'y1'
+      }
+    ]
+  };
+  const config = {
+    data: data,
+    options: {
+      scales: {
+        y: {
+          type: 'linear',
+          position: 'left',
+          title: { display: true, text: 'Temp (°C)' }
+        },
+        y1: {
+          type: 'linear',
+          position: 'right',
+          title: { display: true, text: 'Humidity (%)' }
+        }
+      }
+    }
+  };
+  new Chart(ctx, config);
+}
+
+// 6. Export CSV (directly from tableData)
+document.getElementById('downloadCsv').addEventListener('click', () => {
+  const rows = [['Building','Zone','Temperature','Humidity','RiskScore','TimeHighRH','Status']];
+  tableData.forEach(item => {
+    rows.push([
+      item.building,
+      item.zone,
+      item.temperature,
+      item.humidity,
+      item.riskScore,
+      item.timeHighRH,
+      item.status
+    ]);
+  });
+
+  let csvContent = '';
+  rows.forEach(row => {
+    csvContent += row.join(',') + '\\n';
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', 'MouldRiskData.csv');
+  link.click();
+});
+
+// 7. Export PDF (using pdfmake)
+document.getElementById('downloadPdf').addEventListener('click', () => {
+  const pdfRows = [
+    ['Building','Zone','Temperature','Humidity','RiskScore','TimeHighRH','Status']
+  ];
+  tableData.forEach(item => {
+    pdfRows.push([
+      item.building,
+      item.zone,
+      String(item.temperature),
+      String(item.humidity),
+      String(item.riskScore),
+      item.timeHighRH,
+      item.status
+    ]);
+  });
+
+  const docDefinition = {
+    content: [
+      { text: 'Mould Risk Report', style: 'header' },
+      {
+        table: {
+          body: pdfRows
+        }
+      }
+    ],
+    styles: {
+      header: { fontSize: 16, bold: true }
+    }
+  };
+  pdfMake.createPdf(docDefinition).download('MouldRiskReport.pdf');
+});
+</script>
+</body>
+</html>
