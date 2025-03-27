@@ -1,178 +1,106 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Damp & Mold Dashboard</title>
+    <title>Mold Risk Dashboard</title>
     <style>
         body {
-            font-family: sans-serif; /* Adjust to match the design */
-            margin: 0;
-            padding: 0;
-            background-color: #f0f0f0; /* Background color */
+            font-family: sans-serif;
+            margin: 20px;
         }
-
         .container {
-            width: 1200px; /* Adjust to match the overall width */
-            margin: 20px auto;
-            background-color: #fff;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Box shadow */
-        }
-
-        header {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 20px;
-            border-bottom: 1px solid #ddd;
+            flex-wrap: wrap;
         }
-
-        header h1 {
-            font-size: 24px; /* Adjust font size */
-            color: #333;
-        }
-
-        header p {
-            color: #666;
-        }
-
-        .overview-section {
-            padding: 20px;
-        }
-
-        .overview-cards {
-            display: flex;
-            justify-content: flex-start; /* Adjust as needed */
-            gap: 10px; /* Spacing between cards */
-        }
-
-        .overview-card {
-            background-color: #f9f9f9;
+        .space-card {
             border: 1px solid #ddd;
-            padding: 10px 15px;
-            text-align: center;
-            border-radius: 5px;
-            width: 80px; /* Adjust width */
+            padding: 15px;
+            margin: 10px;
+            width: 250px;
+            box-shadow: 2px 2px 5px #eee;
         }
-
-        .overview-card.high-risk {
-            /* Styles for high-risk card (e.g., red text) */
-            color: red;
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
         }
-
-        .overview-card.caution {
-            /* Styles for caution card (e.g., amber text) */
-            color: #FFA500; /* Amber color */
+        .green { background-color: green; }
+        .amber { background-color: orange; }
+        .red { background-color: red; }
+        .scatter-plot {
+            width: 500px;
+            height: 300px;
+            border: 1px solid #ccc;
+            margin: 20px;
         }
-
-        .overview-card.normal {
-            /* Styles for normal card (e.g., green text) */
-            color: green;
-        }
-
-        .card-number {
-            font-size: 18px; /* Adjust font size */
-            font-weight: bold;
-        }
-
-        .card-label {
-            font-size: 12px; /* Adjust font size */
-            color: #666;
-        }
-
-        /* Add styles for monthly-overview, daily-overview, tables, graphs, etc. */
-
-        /* Example Table Styles (You'll need to complete these) */
-        .damp-risk-table {
-            width: 100%; /* Adjust width */
-        }
-
-        .damp-risk-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .damp-risk-table th, .damp-risk-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-
-        .damp-risk-table th {
-            background-color: #f2f2f2;
-        }
-
-        /* Add styles for the graphs and bar charts (these will be complex) */
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="header-left">
-                <h1>Damp & Mold</h1>
-                </div>
-            <div class="header-right">
-                <p>March 2025</p>
-            </div>
-        </header>
-
-        <section class="overview-section">
-            <div class="overview-cards">
-                <div class="overview-card">
-                    <p class="card-number">5</p>
-                    <p class="card-label">Buildings</p>
-                </div>
-                <div class="overview-card">
-                    <p class="card-number">46</p>
-                    <p class="card-label">Zones</p>
-                </div>
-                <div class="overview-card high-risk">
-                    <p class="card-number">1</p>
-                    <p class="card-label">High Risk</p>
-                </div>
-                <div class="overview-card caution">
-                    <p class="card-number">3</p>
-                    <p class="card-label">Caution</p>
-                </div>
-                <div class="overview-card normal">
-                    <p class="card-number">42</p>
-                    <p class="card-label">Normal</p>
-                </div>
-            </div>
-        </section>
-
-        <section class="monthly-overview">
-            <h2>Monthly Overview</h2>
-            <div class="monthly-content">
-                <div class="monthly-text">
-                    <p>Lowest temps rarely dip below 8°C, highest near 22°C. Humidity remains about 47%, showing steady indoor conditions with minor fluctuations linked to weather or occupancy.</p>
-                </div>
-                <div class="damp-risk-table">
-                    </div>
-            </div>
-        </section>
-
-        <section class="daily-overview">
-            <h2>Daily Overview</h2>
-            <div class="daily-content">
-                <div class="daily-text">
-                    <p>Lowest temps rarely dip below 8°C, highest near 22°C. Humidity remains about 47%, showing steady indoor conditions with minor fluctuations linked to weather or occupancy.</p>
-                </div>
-                <div class="damp-risk-graph">
-                    </div>
-            </div>
-        </section>
-
-        <section class="daily-overview">
-            <h2>Daily Overview</h2>
-            <div class="daily-content">
-                <div class="daily-text">
-                    <p>Lowest temps rarely dip below 8°C, highest near 22°C. Humidity remains about 47%, showing steady indoor conditions with minor fluctuations linked to weather or occupancy.</p>
-                </div>
-                <div class="damp-risk-bars">
-                    </div>
-            </div>
-        </section>
+    <h1>Mold Risk Dashboard</h1>
+    <div class="container" id="space-cards">
+        </div>
+    <div class="scatter-plot">
+        <canvas id="scatterChart"></canvas>
     </div>
-</body>
-</html>
+
+    <script>
+        // Sample data (replace with your actual data)
+        const sampleData = [
+            { space: "Bedroom", timestamp: "2023-10-26 10:00:00", humidity: 55, temperature: 20, hours: 1 },
+            { space: "Bedroom", timestamp: "2023-10-26 11:00:00", humidity: 62, temperature: 21, hours: 1 },
+            { space: "Bedroom", timestamp: "2023-10-26 12:00:00", humidity: 75, temperature: 15, hours: 1 },
+            { space: "Kitchen", timestamp: "2023-10-27 10:00:00", humidity: 50, temperature: 22, hours: 1 },
+            { space: "Kitchen", timestamp: "2023-10-27 11:00:00", humidity: 71, temperature: 20, hours: 1 },
+            { space: "Kitchen", timestamp: "2023-10-27 12:00:00", humidity: 72, temperature: 21, hours: 1 },
+            { space: "Living Room", timestamp: "2023-10-28 10:00:00", humidity: 65, temperature: 18, hours: 1 },
+            { space: "Living Room", timestamp: "2023-10-28 11:00:00", humidity: 58, temperature: 23, hours: 1 },
+            { space: "Living Room", timestamp: "2023-10-28 12:00:00", humidity: 78, temperature: 16, hours: 1 },
+        ];
+
+        function calculateRiskScore(rh, temperature) {
+            if (rh < 60) return 0;
+            if (rh < 70) return 1;
+            if (rh >= 70) {
+                if (temperature < 16 && rh > 65) return 2;
+                else return 2;
+            }
+            return 0;
+        }
+
+        function getRagStatus(riskScore, durationHours) {
+            const dailyAmber = 10;
+            const dailyRed = 30;
+            const weeklyRed = 100;
+            if (durationHours <= 24) {
+                if (riskScore < dailyAmber) return "Green";
+                if (riskScore < dailyRed) return "Amber";
+                return "Red";
+            } else {
+                if (riskScore < dailyAmber * 7) return "Green";
+                if (riskScore < weeklyRed) return "Amber";
+                return "Red";
+            }
+        }
+
+        function createSpaceCards(data) {
+            const spaceCards = document.getElementById("space-cards");
+            const spaceData = {};
+
+            data.forEach(item => {
+                if (!spaceData[item.space]) {
+                    spaceData[item.space] = { riskScores: [], totalHours: 0 };
+                }
+                spaceData[item.space].riskScores.push(calculateRiskScore(item.humidity, item.temperature));
+                spaceData[item.space].totalHours += item.hours;
+            });
+
+            for (const space in spaceData) {
+                const totalRisk = spaceData[space].riskScores.reduce((a, b) => a + b, 0);
+                const status = getRagStatus(totalRisk, spaceData[space].totalHours);
+                const card = document.createElement("div");
+                card.className = "space-card";
+                card.innerHTML = `
+                    <h3>${space}</h3>
+                    <div
