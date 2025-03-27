@@ -1,153 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Time Scatter (RAG) - Working Example</title>
-
-  <!-- 1) Luxon (for Date/Time) -->
-  <script src="https://cdn.jsdelivr.net/npm/luxon@3.3.0/build/global/luxon.min.js"></script>
-  <!-- 2) Chart.js adapter for Luxon (so Chart.js can parse time) -->
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.0"></script>
-  <!-- 3) Chart.js itself -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1"></script>
-
-  <style>
-    /* BASIC PAGE STYLES */
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: Arial, sans-serif;
-      background: #eee;
-      color: #333;
-      padding: 2rem;
-    }
-    .chart-container {
-      max-width: 700px;
-      margin: 0 auto;
-      background: #fff;
-      border-radius: 6px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      padding: 1rem 1.5rem;
-    }
-    h1 {
-      font-size: 1.2rem;
-      margin-bottom: 1rem;
-      color: #444;
-    }
-    canvas {
-      width: 100%;
-      height: 400px; /* Let Chart.js handle the aspect ratio if you prefer. */
-    }
-    .legend {
-      display: flex; 
-      gap: 1.5rem;
-      font-size: 0.9rem;
-      color: #666;
-      margin-top: 0.5rem;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-    .dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-    .dot.green { background: green; }
-    .dot.orange { background: orange; }
-    .dot.red { background: red; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mould Risk Assessment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+        }
+        p {
+            line-height: 1.6;
+        }
+        .thresholds {
+            margin-bottom: 20px;
+        }
+        .threshold {
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin-bottom: 5px;
+        }
+        .green {
+            background-color: #e6ffe6;
+        }
+        .amber {
+            background-color: #fff3e6;
+        }
+        .red {
+            background-color: #ffe6e6;
+        }
+        .score-table {
+            width: 80%;
+            margin: 20px 0;
+            border-collapse: collapse;
+        }
+        .score-table th, .score-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .score-table th {
+            background-color: #f2f2f2;
+        }
+        .classification-table {
+            width: 60%;
+            margin: 20px 0;
+            border-collapse: collapse;
+        }
+        .classification-table th, .classification-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .classification-table th {
+            background-color: #f2f2f2;
+        }
+    </style>
 </head>
 <body>
+    <h1>Mould Risk Scoring and Standards</h1>
 
-<div class="chart-container">
-  <h1>Time Scatter (RAG)</h1>
-  <canvas id="ragChart"></canvas>
-  <div class="legend">
-    <div class="legend-item"><span class="dot green"></span> <span>Low (&lt;60%)</span></div>
-    <div class="legend-item"><span class="dot orange"></span> <span>Caution (60–69%)</span></div>
-    <div class="legend-item"><span class="dot red"></span> <span>High (≥70%)</span></div>
-  </div>
-</div>
+    <h2>Overview</h2>
+    <p>
+        This document explains how to calculate a time-weighted Mould Risk Score based on temperature and relative humidity (RH). It references widely accepted thresholds from ASHRAE, ISO 13788, UK HSE/HHSRS, and EN standards. [cite: 1, 2, 3]
+    </p>
 
-<script>
-// 1) Our scatter data with ISO8601 date/time strings. Chart.js will parse them if we have an adapter.
-const scatterData = [
-  { x: '2025-03-29T07:00', y: 55 }, // green
-  { x: '2025-03-29T08:00', y: 63 }, // orange
-  { x: '2025-03-29T09:00', y: 68 }, // orange
-  { x: '2025-03-29T10:00', y: 72 }, // red
-  { x: '2025-03-29T11:00', y: 75 }, // red
-  { x: '2025-03-29T12:00', y: 59 }, // green
-  { x: '2025-03-29T13:00', y: 67 }, // orange
-  { x: '2025-03-29T14:00', y: 70 }  // red
-];
+    <h2>1. Key RH Thresholds for Mould</h2>
+    <div class="thresholds">
+        <div class="threshold green">&lt;60% RH: Low (Green)</div>
+        <div class="threshold amber">60-69% RH: Caution (Amber)</div>
+        <div class="threshold red">&ge;70% RH: High (Red)</div>
+    </div>
+    <p>
+        Mould typically requires sustained periods of >=70% RH to grow actively. [cite: 3, 4] Below ~60%, mould growth is very unlikely. [cite: 4]
+    </p>
+    <p>
+        UK HSE highlights >70% as a key driver of damp and mould. [cite: 4, 5] ASHRAE guidelines limit comfortable indoor RH to ~60% max; beyond ~70%, mould risk rises quickly. [cite: 5, 6] ISO 13788 references 80% surface humidity (which usually means ~70% air RH at normal temps). [cite: 6, 7]
+    </p>
 
-// 2) Function to get a color based on humidity
-function getRagColor(val) {
-  if (val < 60) return 'green';
-  if (val < 70) return 'orange';
-  return 'red';
-}
+    <h2>2. Time-Weighted Mould Score</h2>
+    <p>
+        A simple points system factors in both severity and duration of high RH: [cite: 7]
+    </p>
 
-// 3) Build the dataset object
-const dataset = {
-  label: 'Humidity Over Time',
-  data: scatterData,
-  showLine: false,
-  pointRadius: 6,
-  pointBackgroundColor: scatterData.map(pt => getRagColor(pt.y)),
-  pointBorderColor: '#fff',
-  borderWidth: 1
-};
+    <table class="score-table">
+        <thead>
+            <tr>
+                <th>RH Range</th>
+                <th>Points</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>RH &lt; 60%</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td>60% &lt;= RH &lt; 70%</td>
+                <td>1</td>
+            </tr>
+            <tr>
+                <td>70% &lt;= RH &lt; 80%</td>
+                <td>2</td>
+            </tr>
+            <tr>
+                <td>RH &gt;= 80%</td>
+                <td>3</td>
+            </tr>
+        </tbody>
+    </table>
 
-// 4) Create the scatter chart
-const ctx = document.getElementById('ragChart').getContext('2d');
-new Chart(ctx, {
-  type: 'scatter',
-  data: { datasets: [ dataset ] },
-  options: {
-    responsive: true,
-    scales: {
-      x: {
-        type: 'time',       // CRITICAL: time axis
-        time: {
-          unit: 'hour',     // Display hours
-          displayFormats: { hour: 'HH:mm' }
-        },
-        title: {
-          display: true,
-          text: 'Time'
-        }
-      },
-      y: {
-        min: 40,
-        max: 80,
-        title: {
-          display: true,
-          text: 'Humidity (%)'
-        }
-      }
-    },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: context => {
-            const val = context.parsed.y;
-            let status = 'High';
-            if (val < 60) status = 'Low';
-            else if (val < 70) status = 'Caution';
-            return `Humidity: ${val}% (${status})`;
-          }
-        }
-      }
-    }
-  }
-});
-</script>
+    <p>
+        If the temperature is &lt;16°C, add +1 point (risk of condensation on cold surfaces). [cite: 7, 8] Each sensor reading yields some points; sum over a day or week. Prolonged or more extreme humidity accumulates more points. [cite: 8, 9, 10]
+    </p>
+
+    <h2>3. Classification Example</h2>
+
+    <table class="classification-table">
+        <thead>
+            <tr>
+                <th>Classification</th>
+                <th>Points</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Low (Green)</td>
+                <td>Daily total below ~20</td>
+            </tr>
+            <tr>
+                <td>Medium (Amber)</td>
+                <td>~20-40 points</td>
+            </tr>
+            <tr>
+                <td>High (Red)</td>
+                <td>40+ points or continuous 24h over 70%</td>
+            </tr>
+        </tbody>
+    </table>
+    <h2>4. References</h2>
+    <p>
+        <b>ASHRAE</b>: 30-60% recommended for health/comfort; ~70% is a typical danger level. Standard 160 warns against >80% surface RH. [cite: 11]
+    </p>
+    <p>
+        <b>ISO 13788</b>: 80% surface RH limit, ~70% air RH. [cite: 11]
+    </p>
+    <p>
+        <b>EN 15251 / EN 16798</b>: Usually <70% RH indoors for comfort. [cite: 11]
+    </p>
+    <p>
+        <b>UK HHSRS / HSE</b>: Damp & mould recognized as category hazards; keep below 70% to prevent growth. [cite: 11]
+    </p>
+
+    <h2>5. Implementation Steps</h2>
+    <ol>
+        <li>Collect Temp & RH readings regularly (every 10 or 15 minutes). [cite: 11, 12]</li>
+        <li>Calculate points as above for each reading; sum daily/weekly. [cite: 12, 13]</li>
+        <li>Flag <b>High</b> if the total is above the threshold or if RH >=70% persists 24+ hours. [cite: 13, 14]</li>
+        <li>Display final classification (e.g., RAG: Green, Amber, Red). [cite: 14]</li>
+    </ol>
+
+    <h2>6. Summary</h2>
+    <p>
+        &lt;60% = safe, >=70% = high risk. [cite: 15, 16] Time-weighted approach ensures prolonged or severe humidity is highlighted. [cite: 16] Aligns with ASHRAE, ISO 13788, and UK HHSRS guidelines.
+    </p>
 
 </body>
 </html>
