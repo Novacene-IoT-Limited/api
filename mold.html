@@ -2,451 +2,173 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Damp & Mould Dashboard Mockup</title>
+  <title>Time Scatter with RAG Status</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    /* BASIC RESET & FONTS */
+    /* Basic reset and layout */
     * {
       box-sizing: border-box;
+      margin: 0; 
+      padding: 0;
     }
     body {
-      margin: 0;
       font-family: Arial, sans-serif;
+      background: #f0f0f0;
       color: #333;
-      background: #fafafa;
-    }
-    a {
-      text-decoration: none;
-      color: inherit;
-    }
-
-    /* HEADER */
-    header {
-      padding: 1rem 2rem;
-      background-color: #fff;
-      border-bottom: 1px solid #ddd;
-    }
-    .header-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .header-top h1 {
-      margin: 0;
-      font-weight: normal;
-      font-size: 1.2rem;
-    }
-    .header-top nav {
-      font-size: 0.9rem;
-      color: #666;
-    }
-    .header-top nav a {
-      margin-left: 1rem;
-      color: #666;
-    }
-
-    /* SUMMARY STATS */
-    .stats-bar {
-      display: flex;
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-    .stat {
-      background-color: #f9f9f9;
       padding: 1rem;
-      flex: 1;
-      text-align: center;
-      border: 1px solid #eee;
-      border-radius: 4px;
     }
-    .stat h2 {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: normal;
-    }
-    .stat p {
-      margin: 0.3rem 0 0;
-      font-size: 0.85rem;
-      color: #666;
-    }
-
-    /* MAIN CONTENT LAYOUT */
-    main {
-      display: flex;
-      flex-direction: row;
-      margin: 1rem 2rem;
-      gap: 2rem;
-    }
-    /* LEFT COLUMN */
-    .left-column,
-    .right-column {
-      flex: 1;
-    }
-
-    /* SECTION TITLES */
-    .section-title {
-      margin: 0 0 0.5rem;
-      font-size: 1.1rem;
-      color: #222;
-    }
-    .section-sub {
-      color: #555;
-      font-size: 0.9rem;
-      line-height: 1.4;
-      margin-bottom: 1rem;
-    }
-
-    /* TABLE */
-    .table-container {
-      background-color: #fff;
-      border: 1px solid #eee;
-      border-radius: 4px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-    }
-    table {
+    .chart-container {
       width: 100%;
-      border-collapse: collapse;
-      margin-top: 0.5rem;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 1rem;
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    th, td {
-      padding: 0.5rem;
-      border-bottom: 1px solid #eee;
-      font-size: 0.9rem;
-      text-align: left;
-    }
-    th {
+    h1 {
+      text-align: center;
+      margin-bottom: 1rem;
+      font-size: 1.4rem;
       font-weight: normal;
       color: #444;
     }
-    tr:last-child td {
-      border-bottom: none;
+
+    /* Chart canvas styling */
+    #ragChart {
+      width: 100%;
+      height: 400px;
     }
 
-    /* CHART WRAPPER */
-    .chart-container {
-      background-color: #fff;
-      border: 1px solid #eee;
-      border-radius: 4px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-    }
-    .chart-header {
+    /* Legend dots (optional) */
+    .legend {
       display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-    }
-    .chart-header .chart-nav {
-      font-size: 0.85rem;
-      color: #666;
-    }
-    .chart-nav span {
-      margin-right: 1rem;
-      cursor: pointer;
-    }
-    .chart-nav span:hover {
-      text-decoration: underline;
-    }
-    .chart-legend {
-      font-size: 0.85rem;
-      color: #666;
-      margin-top: 0.5rem;
-      display: flex;
+      justify-content: center;
       gap: 1rem;
+      margin-top: 0.5rem;
     }
-    .legend-dot {
-      display: inline-block;
-      width: 1rem;
-      height: 1rem;
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.85rem;
+      color: #666;
+    }
+    .dot {
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
-      margin-right: 0.3rem;
+      display: inline-block;
     }
-
-    /* FOOTER (optional) */
-    footer {
-      margin-top: 2rem;
-      padding: 1rem 2rem;
-      font-size: 0.8rem;
-      text-align: center;
-      color: #999;
+    .dot.green {
+      background: green;
+    }
+    .dot.orange {
+      background: orange;
+    }
+    .dot.red {
+      background: red;
     }
   </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<header>
-  <div class="header-top">
-    <h1>Damp & Mold</h1>
-    <nav>
-      <a href="#">Home</a>
-      <a href="#">March 2025</a>
-    </nav>
+<div class="chart-container">
+  <h1>Time Scatter with RAG Status</h1>
+  <canvas id="ragChart"></canvas>
+  <div class="legend">
+    <div class="legend-item"><span class="dot green"></span> <span>Low (<60%)</span></div>
+    <div class="legend-item"><span class="dot orange"></span> <span>Caution (60-69%)</span></div>
+    <div class="legend-item"><span class="dot red"></span> <span>High (≥70%)</span></div>
   </div>
-
-  <!-- SUMMARY STATS -->
-  <div class="stats-bar">
-    <div class="stat">
-      <h2>5</h2>
-      <p>Buildings Connected</p>
-    </div>
-    <div class="stat">
-      <h2>46</h2>
-      <p>Zones Monitored</p>
-    </div>
-    <div class="stat">
-      <h2>1</h2>
-      <p>Zones High Risk</p>
-    </div>
-    <div class="stat">
-      <h2>3</h2>
-      <p>Zones Caution</p>
-    </div>
-    <div class="stat">
-      <h2>42</h2>
-      <p>Total Zones Normal</p>
-    </div>
-  </div>
-</header>
-
-<!-- MAIN CONTENT -->
-<main>
-  <!-- LEFT COLUMN -->
-  <div class="left-column">
-    <!-- Monthly Overview -->
-    <h2 class="section-title">Monthly Overview</h2>
-    <p class="section-sub">Lowest temps rarely dip below 8°C, highest near 22°C. Humidity remains about 47%, showing steady indoor conditions with minor fluctuations linked to weather or occupancy.</p>
-
-    <!-- Table: Damp & Mould Risk at a Glance -->
-    <div class="table-container">
-      <h2 class="section-title">Damp & Mould Risk at a glance</h2>
-      <p class="section-sub">Building Name has been monitored since 12 June 2023</p>
-      <table>
-        <thead>
-          <tr>
-            <th>Building</th>
-            <th>Zone</th>
-            <th>Temp (°C)</th>
-            <th>RH (%)</th>
-            <th>Dew Point (°C)</th>
-            <th>Risk Level</th>
-            <th>Time in High RH</th>
-            <th>Comments</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Happy Hounds</td>
-            <td>Classroom 1</td>
-            <td>19.2</td>
-            <td>81</td>
-            <td>15.5</td>
-            <td>High</td>
-            <td>10h</td>
-            <td>Poor ventilation</td>
-          </tr>
-          <tr>
-            <td>Building A</td>
-            <td>Staff Room</td>
-            <td>20.1</td>
-            <td>68</td>
-            <td>13.9</td>
-            <td>Medium</td>
-            <td>3h</td>
-            <td>Blocked fan</td>
-          </tr>
-          <tr>
-            <td>Building B</td>
-            <td>Library</td>
-            <td>18.4</td>
-            <td>60</td>
-            <td>10.4</td>
-            <td>Low</td>
-            <td>0h</td>
-            <td>No issues</td>
-          </tr>
-          <tr>
-            <td>C</td>
-            <td>Office 2</td>
-            <td>21</td>
-            <td>85</td>
-            <td>18</td>
-            <td>High</td>
-            <td>12h</td>
-            <td>Leaky window detected</td>
-          </tr>
-          <tr>
-            <td>C</td>
-            <td>Storage Room</td>
-            <td>17.5</td>
-            <td>72</td>
-            <td>12.4</td>
-            <td>Medium</td>
-            <td>6h</td>
-            <td>Check for insulation gaps</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Another "Daily Overview" for example text -->
-    <h2 class="section-title">Daily Overview</h2>
-    <p class="section-sub">Lowest temps rarely dip below 8°C, highest near 22°C. Humidity remains about 47%, showing steady indoor conditions with minor fluctuations linked to weather or occupancy.</p>
-  </div>
-
-  <!-- RIGHT COLUMN -->
-  <div class="right-column">
-    <!-- Chart Container 1 -->
-    <div class="chart-container">
-      <div class="chart-header">
-        <h2 class="section-title">Damp & Mould Risk at a glance</h2>
-        <div class="chart-nav">
-          <span>Today</span>
-          <span>Month</span>
-        </div>
-      </div>
-      <canvas id="chartOne"></canvas>
-      <div class="chart-legend">
-        <div>
-          <span class="legend-dot" style="background: red;"></span> Zones High Risk
-        </div>
-        <div>
-          <span class="legend-dot" style="background: orange;"></span> Zones Caution
-        </div>
-        <div>
-          <span class="legend-dot" style="background: green;"></span> Total Zones Normal
-        </div>
-      </div>
-    </div>
-
-    <!-- Chart Container 2 -->
-    <div class="chart-container">
-      <div class="chart-header">
-        <h2 class="section-title">Damp & Mould Risk at a glance</h2>
-        <div class="chart-nav">
-          <span>Today</span>
-          <span>Month</span>
-        </div>
-      </div>
-      <canvas id="chartTwo"></canvas>
-      <div class="chart-legend">
-        <div>
-          <span class="legend-dot" style="background: red;"></span> Zones High Risk
-        </div>
-        <div>
-          <span class="legend-dot" style="background: orange;"></span> Zones Caution
-        </div>
-        <div>
-          <span class="legend-dot" style="background: green;"></span> Total Zones Normal
-        </div>
-      </div>
-    </div>
-  </div>
-</main>
-
-<!-- FOOTER -->
-<footer>
-  Damp & Mould Dashboard © 2025. Demo layout inspired by your mock design.
-</footer>
+</div>
 
 <script>
-// EXAMPLE CHART DATA
-const ctx1 = document.getElementById('chartOne').getContext('2d');
-const chart1Data = {
-  labels: ['08:00','10:00','12:00','14:00','16:00','18:00'],
-  datasets: [
-    {
-      label: 'Temperature (°C)',
-      data: [15, 17, 20, 22, 21, 19],
-      borderColor: '#ff9f40',
-      backgroundColor: '#ff9f40',
-      yAxisID: 'y',
-      type: 'line',
-      tension: 0.3,
-      fill: false
-    },
-    {
-      label: 'Humidity (%)',
-      data: [65, 68, 70, 75, 72, 68],
-      backgroundColor: (ctx) => {
-        const val = ctx.parsed.y;
-        if (val < 60) return 'green';
-        if (val < 70) return 'orange';
-        return 'red';
-      },
-      yAxisID: 'y1',
-      type: 'bar'
-    }
-  ]
+/*
+  EXAMPLE DATA: 
+  Each point is { x: <date_or_time>, y: <humidity_value> }.
+  For demonstration, we’ll store times as strings in "YYYY-MM-DDTHH:mm" form.
+  Chart.js will parse them automatically if 'type: \"time\"' is used.
+*/
+const dataPoints = [
+  { x: '2025-03-27T08:00', y: 55 },  // green
+  { x: '2025-03-27T09:00', y: 63 },  // orange
+  { x: '2025-03-27T10:00', y: 68 },  // orange
+  { x: '2025-03-27T11:00', y: 72 },  // red
+  { x: '2025-03-27T12:00', y: 75 },  // red
+  { x: '2025-03-27T13:00', y: 59 },  // green
+  { x: '2025-03-27T14:00', y: 67 },  // orange
+  { x: '2025-03-27T15:00', y: 70 },  // red (borderline)
+];
+
+// RAG colour function: green <60, orange 60-69, red ≥70
+function getPointColor(hum) {
+  if (hum < 60)   return 'green';
+  if (hum < 70)   return 'orange';
+  return 'red';
+}
+
+// Build the scatter dataset
+const ragDataset = {
+  label: 'Humidity',
+  data: dataPoints,
+  showLine: false,  
+  pointRadius: 6,   // bigger points for clarity
+  pointBackgroundColor: dataPoints.map(pt => getPointColor(pt.y)),
+  pointBorderColor: '#fff',
+  borderWidth: 1
 };
 
-new Chart(ctx1, {
-  type: 'bar',
-  data: chart1Data,
+const ctx = document.getElementById('ragChart').getContext('2d');
+new Chart(ctx, {
+  type: 'scatter',
+  data: {
+    datasets: [ragDataset]
+  },
   options: {
+    responsive: true,
+    maintainAspectRatio: false,
     scales: {
-      y: {
-        type: 'linear',
-        position: 'left',
-        suggestedMin: 10,
-        suggestedMax: 25,
+      x: {
+        type: 'time',
+        time: {
+          unit: 'hour',
+          displayFormats: {
+            hour: 'HH:mm'
+          }
+        },
         title: {
           display: true,
-          text: 'Temp (°C)'
+          text: 'Time'
+        },
+        grid: {
+          color: '#eee'
         }
       },
-      y1: {
-        type: 'linear',
-        position: 'right',
-        suggestedMin: 40,
-        suggestedMax: 90,
+      y: {
+        min: 40,
+        max: 80,
         title: {
           display: true,
           text: 'Humidity (%)'
+        },
+        grid: {
+          color: '#eee'
         }
       }
     },
     plugins: {
-      legend: {
-        display: false
-      }
-    }
-  }
-});
-
-// SECOND CHART
-const ctx2 = document.getElementById('chartTwo').getContext('2d');
-const chart2Data = {
-  labels: ['15th Dec 06:00','09:00','12:00','15:00','18:00','21:00','16th Dec 00:00'],
-  datasets: [
-    {
-      label: 'Humidity (%)',
-      data: [50, 55, 62, 70, 65, 60, 58],
-      backgroundColor: function(ctx) {
-        const val = ctx.parsed.y;
-        if (val < 60) return 'green';
-        if (val < 70) return 'orange';
-        return 'red';
-      }
-    }
-  ]
-};
-
-new Chart(ctx2, {
-  type: 'bar',
-  data: chart2Data,
-  options: {
-    scales: {
-      y: {
-        suggestedMin: 40,
-        suggestedMax: 80,
-        title: {
-          display: true,
-          text: 'Humidity (%)'
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            const humVal = context.parsed.y;
+            let status = 'High';
+            if (humVal < 60) status = 'Low';
+            else if (humVal < 70) status = 'Caution';
+            return `Humidity: ${humVal}% (${status} risk)`;
+          }
         }
-      }
-    },
-    plugins: {
+      },
       legend: {
         display: false
       }
@@ -454,5 +176,6 @@ new Chart(ctx2, {
   }
 });
 </script>
+
 </body>
 </html>
