@@ -66,7 +66,6 @@
                     headers.forEach((header, index) => obj[header] = row[index]);
                     return obj;
                 });
-
                 processData(data);
             });
 
@@ -103,6 +102,10 @@
             let cautionCount = 0;
             let normalCount = 0;
 
+            const tempData = [];
+            const humidityData = [];
+            const timeLabels = [];
+
             data.forEach(item => {
                 const space = item.Space;
                 const timestamp = new Date(item.Timestamp);
@@ -126,11 +129,15 @@
                 if (status === "Red") highRiskCount++;
                 else if (status === "Amber") cautionCount++;
                 else normalCount++;
+
+                tempData.push(parseFloat(item.Temperature));
+                humidityData.push(parseFloat(item.Humidity));
+                timeLabels.push(timestamp.toLocaleTimeString());
             });
 
             populateMetrics(data.length, Object.keys(spaceData).length, highRiskCount, cautionCount, normalCount);
             populateMonthlyTable(data);
-            createTimeSeriesChart(data);
+            createTimeSeriesChart(timeLabels, tempData, humidityData);
             createBarChart(highRiskCount, cautionCount, normalCount);
         }
 
@@ -152,29 +159,6 @@
                 <div class="metric">${normal}<br>Zones Normal</div>
             `;
         }
+
         function populateMonthlyTable(data) {
-            const tableBody = document.querySelector("#monthly-table tbody");
-            tableBody.innerHTML = ""; // Clear existing data
-
-            // Assuming your CSV has 'Building', 'Zone', 'Temperature', 'Humidity', 'Hours', 'Timestamp'
-            data.forEach(item => {
-                const row = document.createElement("tr");
-                row.innerHTML = `
-                    <td><span class="math-inline">\{item\.Space\}</td\>
-<td\></span>{item.Zone}</td>
-                    <td><span class="math-inline">\{item\.Temperature\}</td\>
-<td\></span>{calculateDewPoint(item.Temperature, item.Humidity)}</td>
-                    <td>${getRagStatus(calculateRiskScore(parseFloat(item.Humidity), parseFloat(item.Temperature)), parseFloat(item.Hours))}</td>
-                    <td>-</td>
-                    <td>-</td>
-                `;
-                tableBody.appendChild(row);
-            });
-        }
-
-        function calculateDewPoint(temp, humidity) {
-          const a = 17.27;
-          const b = 237.7;
-          const tempFloat = parseFloat(temp);
-          const humidityFloat = parseFloat(humidity);
-          const alpha = (
+            const tableBody = document.querySelector("#
