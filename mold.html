@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mould Risk Dashboard</title>
+  <!-- Chart.js for graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- pdfmake for PDF export -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfmake/build/pdfmake.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfmake/build/vfs_fonts.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    header { background: #f2f2f2; padding: 1rem; }
+    .cards { display: flex; gap: 1rem; margin: 1rem; }
+    .card { background: #fff; padding: 1rem; border: 1px solid #ddd; flex: 1; text-align: center; }
+    h2 { margin: 0.5rem 0; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { padding: 0.5rem; border: 1px solid #ccc; text-align: left; }
+    .btns { margin: 1rem; }
+    .btns button { margin-right: 0.5rem; padding: 0.5rem 1rem; }
+    #chartContainer { margin: 1rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Mould Risk Dashboard</h1>
+</header>
+
+<!-- Top-level summary cards -->
+<div class="cards">
+  <div class="card">
+    <h2>Buildings</h2>
+    <p id="bldCount">5</p>
+  </div>
+  <div class="card">
+    <h2>Zones Monitored</h2>
+    <p id="zoneCount">46</p>
+  </div>
+  <div class="card">
+    <h2>Zones High Risk</h2>
+    <p id="highRiskCount">2</p>
+  </div>
+  <div class="card">
+    <h2>Zones Caution</h2>
+    <p id="cautionCount">6</p>
+  </div>
+  <div class="card">
+    <h2>Zones Normal</h2>
+    <p id="normalCount">38</p>
+  </div>
+</div>
+
+<!-- Data table -->
+<div style="margin: 1rem;">
+  <table>
+    <thead>
+      <tr>
+        <th>Building</th>
+        <th>Zone</th>
+        <th>Temperature (°C)</th>
+        <th>Humidity (%)</th>
+        <th>Risk Score</th>
+        <th>Time in High RH</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="zoneTableBody">
+      <!-- Dummy rows -->
+      <tr>
+        <td>A</td>
+        <td>Room 101</td>
+        <td>19.2</td>
+        <td>81</td>
+        <td>15</td>
+        <td>8h/24h</td>
+        <td>High</td>
+      </tr>
+      <tr>
+        <td>A</td>
+        <td>Room 102</td>
+        <td>20.1</td>
+        <td>68</td>
+        <td>5</td>
+        <td>3h/24h</td>
+        <td>Medium</td>
+      </tr>
+      <tr>
+        <td>B</td>
+        <td>Library</td>
+        <td>20.0</td>
+        <td>60</td>
+        <td>2</td>
+        <td>0h/24h</td>
+        <td>Low</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Chart container -->
+<div id="chartContainer">
+  <canvas id="rhChart"></canvas>
+</div>
+
+<!-- Buttons for exporting -->
+<div class="btns">
+  <button id="downloadCsv">Export CSV</button>
+  <button id="downloadPdf">Export PDF</button>
+</div>
+
+<script>
+// Example chart data
+const chartCtx = document.getElementById('rhChart').getContext('2d');
+const chartData = {
+  labels: ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00'],
+  datasets: [
+    {
+      type: 'line',
+      label: 'Temperature (°C)',
+      data: [18,19,20,20,21,21,20,19],
+      borderColor: 'blue',
+      yAxisID: 'y'
+    },
+    {
+      type: 'bar',
+      label: 'Humidity (%)',
+      data: [58,62,69,72,75,68,65,60],
+      backgroundColor: function(ctx) {
+        const val = ctx.parsed.y;
+        if (val < 60) { return 'green'; }
+        if (val < 70) { return 'orange'; }
+        return 'red';
+      },
+      yAxisID: 'y1'
+    }
+  ]
+};
+
+const chartConfig = {
+  data: chartData,
+  options: {
+    scales: {
+      y:  { 
+        type: 'linear', 
+        position: 'left', 
+        title: { display: true, text: 'Temp (°C)' } 
+      },
+      y1: { 
+        type: 'linear', 
+        position: 'right',
+        title: { display: true, text: 'Humidity (%)' }
+      }
+    }
+  }
+};
+
+new Chart(chartCtx, chartConfig);
+
+// Simple CSV export
+document.getElementById('downloadCsv').addEventListener('click', () => {
+  const rows = [
+    ['Building','Zone','Temp (°C)','Humidity (%)','Risk Score','Time in High RH','Status'],
+    ['A','Room 101','19.2','81','15','8h/24h','High'],
+    ['A','Room 102','20.1','68','5','3h/24h','Medium'],
+    ['B','Library','20.0','60','2','0h/24h','Low']
+  ];
+  let csvContent = '';
+  rows.forEach(row => {
+    csvContent += row.join(',') + '\\n';
+  });
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'MouldRiskData.csv');
+  link.click();
+});
+
+// Simple PDF export
+document.getElementById('downloadPdf').addEventListener('click', () => {
+  const docDefinition = {
+    content: [
+      { text: 'Mould Risk Report', style: 'header' },
+      '',
+      {
+        table: {
+          body: [
+            ['Building','Zone','Temp (°C)','Humidity (%)','Risk','Time in High RH','Status'],
+            ['A','Room 101','19.2','81','15','8h/24h','High'],
+            ['A','Room 102','20.1','68','5','3h/24h','Medium'],
+            ['B','Library','20.0','60','2','0h/24h','Low']
+          ]
+        }
+      }
+    ],
+    styles: {
+      header: { fontSize: 16, bold: true }
+    }
+  };
+  pdfMake.createPdf(docDefinition).download('MouldRiskReport.pdf');
+});
+</script>
+
+</body>
+</html>
