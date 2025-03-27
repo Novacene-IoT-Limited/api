@@ -3,174 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mould Risk Assessment</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        h1 {
-            color: #333;
-        }
-        h2 {
-            color: #555;
-            margin-top: 30px;
-        }
-        p {
-            line-height: 1.6;
-        }
-        .thresholds {
-            margin-bottom: 20px;
-        }
-        .threshold {
-            padding: 10px;
-            border: 1px solid #ddd;
-            margin-bottom: 5px;
-        }
-        .green {
-            background-color: #e6ffe6;
-        }
-        .amber {
-            background-color: #fff3e6;
-        }
-        .red {
-            background-color: #ffe6e6;
-        }
-        .score-table {
-            width: 80%;
-            margin: 20px 0;
-            border-collapse: collapse;
-        }
-        .score-table th, .score-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        .score-table th {
-            background-color: #f2f2f2;
-        }
-        .classification-table {
-            width: 60%;
-            margin: 20px 0;
-            border-collapse: collapse;
-        }
-        .classification-table th, .classification-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        .classification-table th {
-            background-color: #f2f2f2;
-        }
-    </style>
-</head>
+    <title>Damp & Mold Dashboard</title>
+    <link rel="stylesheet" href="style.css">  </head>
 <body>
-    <h1>Mould Risk Scoring and Standards</h1>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <h1>Damp & Mold</h1>
+                </div>
+            <div class="header-right">
+                <p>March 2025</p>
+            </div>
+        </header>
 
-    <h2>Overview</h2>
-    <p>
-        This document explains how to calculate a time-weighted Mould Risk Score based on temperature and relative humidity (RH). It references widely accepted thresholds from ASHRAE, ISO 13788, UK HSE/HHSRS, and EN standards. [cite: 1, 2, 3]
-    </p>
+        <section class="overview-section">
+            <div class="overview-cards">
+                <div class="overview-card">
+                    <p class="card-number">5</p>
+                    <p class="card-label">Buildings</p>
+                </div>
+                <div class="overview-card">
+                    <p class="card-number">46</p>
+                    <p class="card-label">Zones</p>
+                </div>
+                <div class="overview-card high-risk">
+                    <p class="card-number">1</p>
+                    <p class="card-label">High Risk</p>
+                </div>
+                <div class="overview-card caution">
+                    <p class="card-number">3</p>
+                    <p class="card-label">Caution</p>
+                </div>
+                <div class="overview-card normal">
+                    <p class="card-number">42</p>
+                    <p class="card-label">Normal</p>
+                </div>
+            </div>
+        </section>
 
-    <h2>1. Key RH Thresholds for Mould</h2>
-    <div class="thresholds">
-        <div class="threshold green">&lt;60% RH: Low (Green)</div>
-        <div class="threshold amber">60-69% RH: Caution (Amber)</div>
-        <div class="threshold red">&ge;70% RH: High (Red)</div>
+        <section class="monthly-overview">
+            <h2>Monthly Overview</h2>
+            <div class="monthly-content">
+                <div class="monthly-text">
+                    <p>Lowest temps rarely dip below 8°C, highest near 22°C. Humidity remains about 47%, showing steady indoor conditions with minor fluctuations linked to weather or occupancy.</p>
+                </div>
+                <div class="damp-risk-table">
+                    </div>
+            </div>
+        </section>
+
+        <section class="daily-overview">
+            <h2>Daily Overview</h2>
+            <div class="daily-content">
+                <div class="daily-text">
+                    <p>Lowest temps rarely dip below 8°C, highest near 22°C. Humidity remains about 47%, showing steady indoor conditions with minor fluctuations linked to weather or occupancy.</p>
+                </div>
+                <div class="damp-risk-graph">
+                    </div>
+            </div>
+        </section>
+
+        <section class="daily-overview">
+            <h2>Daily Overview</h2>
+            <div class="daily-content">
+                <div class="daily-text">
+                    <p>Lowest temps rarely dip below 8°C, highest near 22°C. Humidity remains about 47%, showing steady indoor conditions with minor fluctuations linked to weather or occupancy.</p>
+                </div>
+                <div class="damp-risk-bars">
+                    </div>
+            </div>
+        </section>
     </div>
-    <p>
-        Mould typically requires sustained periods of >=70% RH to grow actively. [cite: 3, 4] Below ~60%, mould growth is very unlikely. [cite: 4]
-    </p>
-    <p>
-        UK HSE highlights >70% as a key driver of damp and mould. [cite: 4, 5] ASHRAE guidelines limit comfortable indoor RH to ~60% max; beyond ~70%, mould risk rises quickly. [cite: 5, 6] ISO 13788 references 80% surface humidity (which usually means ~70% air RH at normal temps). [cite: 6, 7]
-    </p>
-
-    <h2>2. Time-Weighted Mould Score</h2>
-    <p>
-        A simple points system factors in both severity and duration of high RH: [cite: 7]
-    </p>
-
-    <table class="score-table">
-        <thead>
-            <tr>
-                <th>RH Range</th>
-                <th>Points</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>RH &lt; 60%</td>
-                <td>0</td>
-            </tr>
-            <tr>
-                <td>60% &lt;= RH &lt; 70%</td>
-                <td>1</td>
-            </tr>
-            <tr>
-                <td>70% &lt;= RH &lt; 80%</td>
-                <td>2</td>
-            </tr>
-            <tr>
-                <td>RH &gt;= 80%</td>
-                <td>3</td>
-            </tr>
-        </tbody>
-    </table>
-
-    <p>
-        If the temperature is &lt;16°C, add +1 point (risk of condensation on cold surfaces). [cite: 7, 8] Each sensor reading yields some points; sum over a day or week. Prolonged or more extreme humidity accumulates more points. [cite: 8, 9, 10]
-    </p>
-
-    <h2>3. Classification Example</h2>
-
-    <table class="classification-table">
-        <thead>
-            <tr>
-                <th>Classification</th>
-                <th>Points</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>Low (Green)</td>
-                <td>Daily total below ~20</td>
-            </tr>
-            <tr>
-                <td>Medium (Amber)</td>
-                <td>~20-40 points</td>
-            </tr>
-            <tr>
-                <td>High (Red)</td>
-                <td>40+ points or continuous 24h over 70%</td>
-            </tr>
-        </tbody>
-    </table>
-    <h2>4. References</h2>
-    <p>
-        <b>ASHRAE</b>: 30-60% recommended for health/comfort; ~70% is a typical danger level. Standard 160 warns against >80% surface RH. [cite: 11]
-    </p>
-    <p>
-        <b>ISO 13788</b>: 80% surface RH limit, ~70% air RH. [cite: 11]
-    </p>
-    <p>
-        <b>EN 15251 / EN 16798</b>: Usually <70% RH indoors for comfort. [cite: 11]
-    </p>
-    <p>
-        <b>UK HHSRS / HSE</b>: Damp & mould recognized as category hazards; keep below 70% to prevent growth. [cite: 11]
-    </p>
-
-    <h2>5. Implementation Steps</h2>
-    <ol>
-        <li>Collect Temp & RH readings regularly (every 10 or 15 minutes). [cite: 11, 12]</li>
-        <li>Calculate points as above for each reading; sum daily/weekly. [cite: 12, 13]</li>
-        <li>Flag <b>High</b> if the total is above the threshold or if RH >=70% persists 24+ hours. [cite: 13, 14]</li>
-        <li>Display final classification (e.g., RAG: Green, Amber, Red). [cite: 14]</li>
-    </ol>
-
-    <h2>6. Summary</h2>
-    <p>
-        &lt;60% = safe, >=70% = high risk. [cite: 15, 16] Time-weighted approach ensures prolonged or severe humidity is highlighted. [cite: 16] Aligns with ASHRAE, ISO 13788, and UK HHSRS guidelines.
-    </p>
-
 </body>
 </html>
