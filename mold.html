@@ -2,147 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Damp & Mould Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>Time Scatter (RAG) - Working Example</title>
+
+  <!-- 1) Luxon (for Date/Time) -->
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.3.0/build/global/luxon.min.js"></script>
+  <!-- 2) Chart.js adapter for Luxon (so Chart.js can parse time) -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.0"></script>
+  <!-- 3) Chart.js itself -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1"></script>
+
   <style>
-    /* RESET & BASE STYLES */
-    * {
-      box-sizing: border-box;
-      margin: 0; 
-      padding: 0;
-    }
+    /* BASIC PAGE STYLES */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: Arial, sans-serif;
-      background: #f0f0f0;
+      background: #eee;
       color: #333;
+      padding: 2rem;
     }
-
-    /* HEADER & STAT CARDS */
-    header {
+    .chart-container {
+      max-width: 700px;
+      margin: 0 auto;
       background: #fff;
-      padding: 1rem 2rem;
-      border-bottom: 1px solid #ddd;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 1rem 1.5rem;
     }
-    .top-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .top-row h1 {
-      font-weight: normal;
+    h1 {
       font-size: 1.2rem;
+      margin-bottom: 1rem;
       color: #444;
     }
-    nav a {
-      margin-left: 1rem;
-      text-decoration: none;
-      color: #666;
-      font-size: 0.9rem;
-    }
-    .stats-bar {
-      display: flex;
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-    .stat {
-      background-color: #fafafa;
-      flex: 1;
-      padding: 1rem;
-      border: 1px solid #eee;
-      border-radius: 4px;
-      text-align: center;
-    }
-    .stat h2 {
-      margin: 0;
-      font-size: 1.4rem;
-      color: #333;
-    }
-    .stat p {
-      margin: 0.2rem 0 0;
-      font-size: 0.8rem;
-      color: #666;
-    }
-
-    /* MAIN CONTAINER */
-    main {
-      display: flex;
-      gap: 2rem;
-      padding: 1rem 2rem;
-    }
-    .left-col, .right-col {
-      flex: 1;
-      min-width: 300px;
-    }
-
-    /* TABLE WRAPPER */
-    .table-section {
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      margin-bottom: 1rem;
-      padding: 1rem;
-    }
-    .table-section h2 {
-      font-size: 1.1rem;
-      margin-bottom: 0.5rem;
-      color: #444;
-    }
-    .table-section p {
-      font-size: 0.85rem;
-      color: #666;
-      margin-bottom: 1rem;
-    }
-    table {
+    canvas {
       width: 100%;
-      border-collapse: collapse;
-    }
-    th, td {
-      font-size: 0.9rem;
-      padding: 0.5rem;
-      border-bottom: 1px solid #eee;
-      text-align: left;
-    }
-    th {
-      color: #444;
-      font-weight: normal;
-    }
-    tr:last-child td {
-      border-bottom: none;
-    }
-
-    /* CHART WRAPPER */
-    .chart-section {
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-    }
-    .chart-section h2 {
-      margin-bottom: 0.5rem;
-      font-size: 1.1rem;
-      color: #444;
-    }
-    .chart-section p {
-      font-size: 0.85rem;
-      color: #666;
-      margin-bottom: 1rem;
-    }
-    #ragChart {
-      width: 100%;
-      height: 350px;
+      height: 400px; /* Let Chart.js handle the aspect ratio if you prefer. */
     }
     .legend {
-      display: flex;
-      gap: 1rem;
-      font-size: 0.85rem;
+      display: flex; 
+      gap: 1.5rem;
+      font-size: 0.9rem;
       color: #666;
       margin-top: 0.5rem;
     }
     .legend-item {
       display: flex;
       align-items: center;
-      gap: 0.3rem;
+      gap: 0.4rem;
     }
     .dot {
       width: 12px;
@@ -153,199 +58,68 @@
     .dot.green { background: green; }
     .dot.orange { background: orange; }
     .dot.red { background: red; }
-
-    /* FOOTER */
-    footer {
-      text-align: center;
-      font-size: 0.8rem;
-      color: #999;
-      padding: 1rem;
-      border-top: 1px solid #ddd;
-    }
   </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<header>
-  <div class="top-row">
-    <h1>Damp & Mould Dashboard</h1>
-    <nav>
-      <a href="#">Home</a>
-      <a href="#">Monthly Stats</a>
-    </nav>
+<div class="chart-container">
+  <h1>Time Scatter (RAG)</h1>
+  <canvas id="ragChart"></canvas>
+  <div class="legend">
+    <div class="legend-item"><span class="dot green"></span> <span>Low (&lt;60%)</span></div>
+    <div class="legend-item"><span class="dot orange"></span> <span>Caution (60–69%)</span></div>
+    <div class="legend-item"><span class="dot red"></span> <span>High (≥70%)</span></div>
   </div>
-  <div class="stats-bar">
-    <div class="stat">
-      <h2>5</h2>
-      <p>Buildings Connected</p>
-    </div>
-    <div class="stat">
-      <h2>46</h2>
-      <p>Zones Monitored</p>
-    </div>
-    <div class="stat">
-      <h2>1</h2>
-      <p>Zones High Risk</p>
-    </div>
-    <div class="stat">
-      <h2>3</h2>
-      <p>Zones Caution</p>
-    </div>
-    <div class="stat">
-      <h2>42</h2>
-      <p>Zones Normal</p>
-    </div>
-  </div>
-</header>
-
-<!-- MAIN CONTENT -->
-<main>
-  <!-- LEFT COLUMN: TABLE & TEXT -->
-  <div class="left-col">
-    <div class="table-section">
-      <h2>Damp & Mould Risk at a Glance</h2>
-      <p>Live data from sensors, updated hourly. A higher rating indicates more frequent or severe high RH.</p>
-      <table>
-        <thead>
-          <tr>
-            <th>Building</th>
-            <th>Zone</th>
-            <th>Temp (°C)</th>
-            <th>RH (%)</th>
-            <th>Risk Score</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Building A</td>
-            <td>Room 101</td>
-            <td>19.2</td>
-            <td>81</td>
-            <td>7</td>
-            <td>High</td>
-          </tr>
-          <tr>
-            <td>Building A</td>
-            <td>Room 102</td>
-            <td>20.1</td>
-            <td>68</td>
-            <td>4</td>
-            <td>Medium</td>
-          </tr>
-          <tr>
-            <td>Building B</td>
-            <td>Library</td>
-            <td>18.4</td>
-            <td>60</td>
-            <td>2</td>
-            <td>Low</td>
-          </tr>
-          <tr>
-            <td>Building C</td>
-            <td>Office 2</td>
-            <td>21.0</td>
-            <td>85</td>
-            <td>9</td>
-            <td>High</td>
-          </tr>
-          <tr>
-            <td>Building C</td>
-            <td>Storage</td>
-            <td>17.5</td>
-            <td>72</td>
-            <td>5</td>
-            <td>Medium</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <p style="font-size:0.9rem; color:#666;">
-      In-depth monthly reviews show average humidity at 47%. Some spikes occur with weather changes or occupant load. High-risk zones need ventilation checks, possible insulation or damp-proofing.
-    </p>
-  </div>
-
-  <!-- RIGHT COLUMN: SCATTER CHART -->
-  <div class="right-col">
-    <div class="chart-section">
-      <h2>Daily Time Scatter (RAG Status)</h2>
-      <p>Each dot is a 1-hour reading. Colour is based on RH threshold: green <60, orange <70, red ≥70.</p>
-      <canvas id="ragChart"></canvas>
-      <div class="legend">
-        <div class="legend-item">
-          <span class="dot green"></span>
-          <span>Low (<60%)</span>
-        </div>
-        <div class="legend-item">
-          <span class="dot orange"></span>
-          <span>Caution (60-69%)</span>
-        </div>
-        <div class="legend-item">
-          <span class="dot red"></span>
-          <span>High (≥70%)</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</main>
-
-<footer>
-  Damp & Mould Dashboard © 2025. Demo layout. Customize fonts, spacing, or colours as you wish.
-</footer>
+</div>
 
 <script>
-// EXAMPLE TIME SCATTER DATA
-// Each point is { x: <date/time string>, y: <humidity> }.
+// 1) Our scatter data with ISO8601 date/time strings. Chart.js will parse them if we have an adapter.
 const scatterData = [
-  { x: '2025-03-28T08:00', y: 55 },  // green
-  { x: '2025-03-28T09:00', y: 63 },  // orange
-  { x: '2025-03-28T10:00', y: 68 },  // orange
-  { x: '2025-03-28T11:00', y: 72 },  // red
-  { x: '2025-03-28T12:00', y: 75 },  // red
-  { x: '2025-03-28T13:00', y: 59 },  // green
-  { x: '2025-03-28T14:00', y: 67 },  // orange
-  { x: '2025-03-28T15:00', y: 70 }   // red
+  { x: '2025-03-29T07:00', y: 55 }, // green
+  { x: '2025-03-29T08:00', y: 63 }, // orange
+  { x: '2025-03-29T09:00', y: 68 }, // orange
+  { x: '2025-03-29T10:00', y: 72 }, // red
+  { x: '2025-03-29T11:00', y: 75 }, // red
+  { x: '2025-03-29T12:00', y: 59 }, // green
+  { x: '2025-03-29T13:00', y: 67 }, // orange
+  { x: '2025-03-29T14:00', y: 70 }  // red
 ];
 
-// Function to assign RAG colour based on RH
-function getColor(rh) {
-  if (rh < 60) return 'green';
-  if (rh < 70) return 'orange';
+// 2) Function to get a color based on humidity
+function getRagColor(val) {
+  if (val < 60) return 'green';
+  if (val < 70) return 'orange';
   return 'red';
 }
 
-// Build dataset
-const ragDataset = {
-  label: 'Humidity',
+// 3) Build the dataset object
+const dataset = {
+  label: 'Humidity Over Time',
   data: scatterData,
   showLine: false,
-  pointRadius: 5,
-  pointBackgroundColor: scatterData.map(dp => getColor(dp.y)),
+  pointRadius: 6,
+  pointBackgroundColor: scatterData.map(pt => getRagColor(pt.y)),
   pointBorderColor: '#fff',
   borderWidth: 1
 };
 
+// 4) Create the scatter chart
 const ctx = document.getElementById('ragChart').getContext('2d');
 new Chart(ctx, {
   type: 'scatter',
-  data: { datasets: [ragDataset] },
+  data: { datasets: [ dataset ] },
   options: {
     responsive: true,
-    maintainAspectRatio: false,
     scales: {
       x: {
-        type: 'time',
+        type: 'time',       // CRITICAL: time axis
         time: {
-          unit: 'hour',
+          unit: 'hour',     // Display hours
           displayFormats: { hour: 'HH:mm' }
         },
         title: {
           display: true,
           text: 'Time'
-        },
-        grid: {
-          color: '#eee'
         }
       },
       y: {
@@ -354,30 +128,26 @@ new Chart(ctx, {
         title: {
           display: true,
           text: 'Humidity (%)'
-        },
-        grid: {
-          color: '#eee'
         }
       }
     },
     plugins: {
+      legend: { display: false },
       tooltip: {
         callbacks: {
-          label: function(context) {
-            const humVal = context.parsed.y;
-            let txt = 'High';
-            if (humVal < 60) txt = 'Low';
-            else if (humVal < 70) txt = 'Caution';
-            return `Humidity: ${humVal}% (${txt})`;
+          label: context => {
+            const val = context.parsed.y;
+            let status = 'High';
+            if (val < 60) status = 'Low';
+            else if (val < 70) status = 'Caution';
+            return `Humidity: ${val}% (${status})`;
           }
         }
-      },
-      legend: {
-        display: false
       }
     }
   }
 });
 </script>
+
 </body>
 </html>
