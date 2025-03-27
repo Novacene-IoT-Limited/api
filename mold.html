@@ -4,7 +4,107 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Damp & Mold Dashboard</title>
-    <link rel="stylesheet" href="style.css">  </head>
+    <style>
+        body {
+            font-family: sans-serif; /* Adjust to match the design */
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0; /* Background color */
+        }
+
+        .container {
+            width: 1200px; /* Adjust to match the overall width */
+            margin: 20px auto;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Box shadow */
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        header h1 {
+            font-size: 24px; /* Adjust font size */
+            color: #333;
+        }
+
+        header p {
+            color: #666;
+        }
+
+        .overview-section {
+            padding: 20px;
+        }
+
+        .overview-cards {
+            display: flex;
+            justify-content: flex-start; /* Adjust as needed */
+            gap: 10px; /* Spacing between cards */
+        }
+
+        .overview-card {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 10px 15px;
+            text-align: center;
+            border-radius: 5px;
+            width: 80px; /* Adjust width */
+        }
+
+        .overview-card.high-risk {
+            /* Styles for high-risk card (e.g., red text) */
+            color: red;
+        }
+
+        .overview-card.caution {
+            /* Styles for caution card (e.g., amber text) */
+            color: #FFA500; /* Amber color */
+        }
+
+        .overview-card.normal {
+            /* Styles for normal card (e.g., green text) */
+            color: green;
+        }
+
+        .card-number {
+            font-size: 18px; /* Adjust font size */
+            font-weight: bold;
+        }
+
+        .card-label {
+            font-size: 12px; /* Adjust font size */
+            color: #666;
+        }
+
+        /* Add styles for monthly-overview, daily-overview, tables, graphs, etc. */
+
+        /* Example Table Styles (You'll need to complete these) */
+        .damp-risk-table {
+            width: 100%; /* Adjust width */
+        }
+
+        .damp-risk-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .damp-risk-table th, .damp-risk-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .damp-risk-table th {
+            background-color: #f2f2f2;
+        }
+
+        /* Add styles for the graphs and bar charts (these will be complex) */
+    </style>
+</head>
 <body>
     <div class="container">
         <header>
