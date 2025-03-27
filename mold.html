@@ -1,63 +1,74 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mold Risk Dashboard</title>
+    <title>Damp & Mold Dashboard</title>
     <style>
-        body {
-            font-family: sans-serif;
-            margin: 20px;
-        }
-        .container {
-            display: flex;
-            flex-wrap: wrap;
-        }
-        .space-card {
-            border: 1px solid #ddd;
-            padding: 15px;
-            margin: 10px;
-            width: 250px;
-            box-shadow: 2px 2px 5px #eee;
-        }
-        .status-indicator {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 10px;
-        }
-        .green { background-color: green; }
-        .amber { background-color: orange; }
-        .red { background-color: red; }
-        .scatter-plot {
-            width: 500px;
-            height: 300px;
-            border: 1px solid #ccc;
-            margin: 20px;
-        }
+        body { font-family: sans-serif; margin: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; }
+        .metrics { display: flex; justify-content: space-around; margin: 20px 0; }
+        .metric { text-align: center; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .chart { width: 100%; height: 300px; border: 1px solid #ccc; margin-top: 20px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <h1>Mold Risk Dashboard</h1>
-    <div class="container" id="space-cards">
-        </div>
-    <div class="scatter-plot">
-        <canvas id="scatterChart"></canvas>
+    <div class="header">
+        <div>Home / Damp & Mold</div>
+        <div>March 2025</div>
     </div>
 
+    <div class="metrics" id="metrics-data">
+        </div>
+
+    <h2>Monthly Overview</h2>
+    <p>Lowest temps rarely dip below 8 °C, highest near 22 °C. Humidity remains about 47%, showing steady indoor conditions with minor fluctuations linked to weather or occupancy.</p>
+    <table class="table" id="monthly-table">
+        <thead>
+            <tr>
+                <th>Building</th>
+                <th>Zone</th>
+                <th>Temp (°C)</th>
+                <th>Dew Point (°C)</th>
+                <th>Risk Level</th>
+                <th>Time in High RH</th>
+                <th>Comments</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
+    </table>
+
+    <h2>Daily Overview</h2>
+    <p>Lowest temps rarely dip below 8 °C, highest near 22 °C. Humidity remains about 47%, showing steady indoor conditions with minor fluctuations linked to weather or occupancy.</p>
+    <div class="chart">
+        <canvas id="timeSeriesChart"></canvas>
+    </div>
+    <p id="daily-summary-1">Zones High Risk: 0, Zones Caution: 0, Total Zones Normal: 0</p>
+
+    <h2>Daily Overview</h2>
+    <p>Lowest temps rarely dip below 8 °C, highest near 22 °C. Humidity remains about 47%, showing steady indoor conditions with minor fluctuations linked to weather or occupancy.</p>
+    <div class="chart">
+        <canvas id="barChart"></canvas>
+    </div>
+    <p id="daily-summary-2">Zones High Risk: 0, Zones Caution: 0, Total Zones Normal: 0</p>
+
     <script>
-        // Sample data (replace with your actual data)
-        const sampleData = [
-            { space: "Bedroom", timestamp: "2023-10-26 10:00:00", humidity: 55, temperature: 20, hours: 1 },
-            { space: "Bedroom", timestamp: "2023-10-26 11:00:00", humidity: 62, temperature: 21, hours: 1 },
-            { space: "Bedroom", timestamp: "2023-10-26 12:00:00", humidity: 75, temperature: 15, hours: 1 },
-            { space: "Kitchen", timestamp: "2023-10-27 10:00:00", humidity: 50, temperature: 22, hours: 1 },
-            { space: "Kitchen", timestamp: "2023-10-27 11:00:00", humidity: 71, temperature: 20, hours: 1 },
-            { space: "Kitchen", timestamp: "2023-10-27 12:00:00", humidity: 72, temperature: 21, hours: 1 },
-            { space: "Living Room", timestamp: "2023-10-28 10:00:00", humidity: 65, temperature: 18, hours: 1 },
-            { space: "Living Room", timestamp: "2023-10-28 11:00:00", humidity: 58, temperature: 23, hours: 1 },
-            { space: "Living Room", timestamp: "2023-10-28 12:00:00", humidity: 78, temperature: 16, hours: 1 },
-        ];
+        // Fetch and process CSV data
+        fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vTtyaaD9UIdtuhO9BW1q6Mb4-26_jsidDU73HB1DE4Y8FE1tKSQxIAkLasrc3bT-0mvDy4ejjgTPJm1/pub?gid=0&single=true&output=csv")
+            .then(response => response.text())
+            .then(csvData => {
+                const rows = csvData.split("\n").map(row => row.split(","));
+                const headers = rows[0];
+                const data = rows.slice(1).map(row => {
+                    const obj = {};
+                    headers.forEach((header, index) => obj[header] = row[index]);
+                    return obj;
+                });
+
+                processData(data);
+            });
 
         function calculateRiskScore(rh, temperature) {
             if (rh < 60) return 0;
@@ -84,23 +95,86 @@
             }
         }
 
-        function createSpaceCards(data) {
-            const spaceCards = document.getElementById("space-cards");
+        function processData(data) {
             const spaceData = {};
+            const dailyData = {};
+            const weeklyData = {};
+            let highRiskCount = 0;
+            let cautionCount = 0;
+            let normalCount = 0;
 
             data.forEach(item => {
-                if (!spaceData[item.space]) {
-                    spaceData[item.space] = { riskScores: [], totalHours: 0 };
-                }
-                spaceData[item.space].riskScores.push(calculateRiskScore(item.humidity, item.temperature));
-                spaceData[item.space].totalHours += item.hours;
+                const space = item.Space;
+                const timestamp = new Date(item.Timestamp);
+                const date = timestamp.toISOString().split("T")[0];
+                const week = getWeekNumber(timestamp);
+                const riskScore = calculateRiskScore(parseFloat(item.Humidity), parseFloat(item.Temperature));
+                const status = getRagStatus(riskScore, parseFloat(item.Hours));
+
+                if (!spaceData[space]) spaceData[space] = { riskScores: [], totalHours: 0 };
+                spaceData[space].riskScores.push(riskScore);
+                spaceData[space].totalHours += parseFloat(item.Hours);
+
+                if (!dailyData[date]) dailyData[date] = { riskScores: [], totalHours: 0 };
+                dailyData[date].riskScores.push(riskScore);
+                dailyData[date].totalHours += parseFloat(item.Hours);
+
+                if (!weeklyData[week]) weeklyData[week] = { riskScores: [], totalHours: 0 };
+                weeklyData[week].riskScores.push(riskScore);
+                weeklyData[week].totalHours += parseFloat(item.Hours);
+
+                if (status === "Red") highRiskCount++;
+                else if (status === "Amber") cautionCount++;
+                else normalCount++;
             });
 
-            for (const space in spaceData) {
-                const totalRisk = spaceData[space].riskScores.reduce((a, b) => a + b, 0);
-                const status = getRagStatus(totalRisk, spaceData[space].totalHours);
-                const card = document.createElement("div");
-                card.className = "space-card";
-                card.innerHTML = `
-                    <h3>${space}</h3>
-                    <div
+            populateMetrics(data.length, Object.keys(spaceData).length, highRiskCount, cautionCount, normalCount);
+            populateMonthlyTable(data);
+            createTimeSeriesChart(data);
+            createBarChart(highRiskCount, cautionCount, normalCount);
+        }
+
+        function getWeekNumber(date) {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+        }
+
+        function populateMetrics(totalDataPoints, totalSpaces, highRisk, caution, normal) {
+            const metricsDiv = document.getElementById("metrics-data");
+            metricsDiv.innerHTML = `
+                <div class="metric"><span class="math-inline">\{totalSpaces\}<br\>Buildings Connected</div\>
+<div class\="metric"\></span>{totalDataPoints}<br>Zones Monitored</div>
+                <div class="metric"><span class="math-inline">\{highRisk\}<br\>Zones High Risk</div\>
+<div class\="metric"\></span>{caution}<br>Zones Caution</div>
+                <div class="metric">${normal}<br>Zones Normal</div>
+            `;
+        }
+        function populateMonthlyTable(data) {
+            const tableBody = document.querySelector("#monthly-table tbody");
+            tableBody.innerHTML = ""; // Clear existing data
+
+            // Assuming your CSV has 'Building', 'Zone', 'Temperature', 'Humidity', 'Hours', 'Timestamp'
+            data.forEach(item => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td><span class="math-inline">\{item\.Space\}</td\>
+<td\></span>{item.Zone}</td>
+                    <td><span class="math-inline">\{item\.Temperature\}</td\>
+<td\></span>{calculateDewPoint(item.Temperature, item.Humidity)}</td>
+                    <td>${getRagStatus(calculateRiskScore(parseFloat(item.Humidity), parseFloat(item.Temperature)), parseFloat(item.Hours))}</td>
+                    <td>-</td>
+                    <td>-</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function calculateDewPoint(temp, humidity) {
+          const a = 17.27;
+          const b = 237.7;
+          const tempFloat = parseFloat(temp);
+          const humidityFloat = parseFloat(humidity);
+          const alpha = (
