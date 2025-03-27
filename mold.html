@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mould Risk Dashboard</title>
+  <title>Mould Risk Dashboard (Demo)</title>
   <!-- Chart.js for graphs -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- pdfmake for PDF export -->
@@ -24,30 +24,14 @@
 <body>
 
 <header>
-  <h1>Mould Risk Dashboard</h1>
+  <h1>Mould Risk Dashboard (Fetching from Google Sheets)</h1>
 </header>
 
 <!-- Top-level summary cards -->
 <div class="cards">
   <div class="card">
-    <h2>Buildings</h2>
-    <p id="bldCount">5</p>
-  </div>
-  <div class="card">
-    <h2>Zones Monitored</h2>
-    <p id="zoneCount">46</p>
-  </div>
-  <div class="card">
-    <h2>Zones High Risk</h2>
-    <p id="highRiskCount">2</p>
-  </div>
-  <div class="card">
-    <h2>Zones Caution</h2>
-    <p id="cautionCount">6</p>
-  </div>
-  <div class="card">
-    <h2>Zones Normal</h2>
-    <p id="normalCount">38</p>
+    <h2>Records Found</h2>
+    <p id="recordsCount">0</p>
   </div>
 </div>
 
@@ -56,44 +40,12 @@
   <table>
     <thead>
       <tr>
-        <th>Building</th>
-        <th>Zone</th>
+        <th>Timestamp</th>
         <th>Temperature (°C)</th>
-        <th>Humidity (%)</th>
-        <th>Risk Score</th>
-        <th>Time in High RH</th>
-        <th>Status</th>
       </tr>
     </thead>
     <tbody id="zoneTableBody">
-      <!-- Dummy rows -->
-      <tr>
-        <td>A</td>
-        <td>Room 101</td>
-        <td>19.2</td>
-        <td>81</td>
-        <td>15</td>
-        <td>8h/24h</td>
-        <td>High</td>
-      </tr>
-      <tr>
-        <td>A</td>
-        <td>Room 102</td>
-        <td>20.1</td>
-        <td>68</td>
-        <td>5</td>
-        <td>3h/24h</td>
-        <td>Medium</td>
-      </tr>
-      <tr>
-        <td>B</td>
-        <td>Library</td>
-        <td>20.0</td>
-        <td>60</td>
-        <td>2</td>
-        <td>0h/24h</td>
-        <td>Low</td>
-      </tr>
+      <!-- Populated dynamically from CSV -->
     </tbody>
   </table>
 </div>
@@ -110,61 +62,143 @@
 </div>
 
 <script>
-// Example chart data
-const chartCtx = document.getElementById('rhChart').getContext('2d');
-const chartData = {
-  labels: ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00'],
-  datasets: [
-    {
-      type: 'line',
-      label: 'Temperature (°C)',
-      data: [18,19,20,20,21,21,20,19],
-      borderColor: 'blue',
-      yAxisID: 'y'
-    },
-    {
-      type: 'bar',
-      label: 'Humidity (%)',
-      data: [58,62,69,72,75,68,65,60],
-      backgroundColor: function(ctx) {
-        const val = ctx.parsed.y;
-        if (val < 60) { return 'green'; }
-        if (val < 70) { return 'orange'; }
-        return 'red';
-      },
-      yAxisID: 'y1'
-    }
-  ]
-};
+// --------------------------------------------------------------------
+// 1) REPLACE with your published Google Sheet CSV link
+// (Ensure your sheet has a column for timestamp and a column containing the word "temperature")
+// --------------------------------------------------------------------
+const GOOGLE_SHEET_CSV_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vTtyaaD9UIdtuhO9BW1q6Mb4-26_jsidDU73HB1DE4Y8FE1tKSQxIAkLasrc3bT-0mvDy4ejjgTPJm1/pub?gid=0&single=true&output=csv';
 
-const chartConfig = {
-  data: chartData,
-  options: {
-    scales: {
-      y:  { 
-        type: 'linear', 
-        position: 'left', 
-        title: { display: true, text: 'Temp (°C)' } 
-      },
-      y1: { 
-        type: 'linear', 
-        position: 'right',
-        title: { display: true, text: 'Humidity (%)' }
+// We'll store parsed rows in an array
+let tableData = [];
+
+// Columns we expect: e.g. "Timestamp" and some "temperature" column
+let indexTimestamp = -1;
+let indexTemperature = -1;
+
+// 2) FETCH CSV from Google Sheets
+fetch(GOOGLE_SHEET_CSV_URL)
+  .then(response => response.text())
+  .then(csv => {
+    parseCsv(csv);
+    updateDashboard();
+    buildTable();
+    buildChart();
+  })
+  .catch(err => console.error('Error fetching CSV:', err));
+
+// 3) PARSE CSV
+function parseCsv(csv) {
+  // Split lines
+  const lines = csv.split('\\n').filter(line => line.trim().length > 0);
+  if (!lines.length) return;
+
+  // First line: headers
+  const headers = lines[0].split(',');
+
+  // Identify which columns hold "Timestamp" and "temperature"
+  // We'll do a naive case-insensitive match on the header text.
+  headers.forEach((hdr, idx) => {
+    const lowerHdr = hdr.toLowerCase();
+    if (lowerHdr.includes('timestamp')) {
+      indexTimestamp = idx;
+    }
+    if (lowerHdr.includes('temperature')) {
+      indexTemperature = idx;
+    }
+  });
+
+  // If either index not found, we won't parse further
+  if (indexTimestamp === -1 || indexTemperature === -1) {
+    console.warn('Could not find expected columns. Check your CSV headers.');
+    return;
+  }
+
+  // Subsequent lines: data
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i].split(',');
+    if (row.length !== headers.length) continue;
+
+    const ts = row[indexTimestamp];
+    const tempStr = row[indexTemperature];
+    // Convert temperature to float if possible
+    const tempVal = parseFloat(tempStr);
+
+    // We store each row as an object
+    tableData.push({ timestamp: ts, temperature: tempVal });
+  }
+}
+
+// 4) UPDATE DASHBOARD COUNTERS
+function updateDashboard() {
+  document.getElementById('recordsCount').innerText = tableData.length;
+}
+
+// 5) BUILD TABLE
+function buildTable() {
+  const tbody = document.getElementById('zoneTableBody');
+  tbody.innerHTML = ''; // clear existing
+
+  tableData.forEach(item => {
+    const tr = document.createElement('tr');
+
+    const tdTime = document.createElement('td');
+    tdTime.textContent = item.timestamp;
+    tr.appendChild(tdTime);
+
+    const tdTemp = document.createElement('td');
+    tdTemp.textContent = item.temperature ? item.temperature.toFixed(1) : 'N/A';
+    tr.appendChild(tdTemp);
+
+    tbody.appendChild(tr);
+  });
+}
+
+// 6) BUILD CHART
+function buildChart() {
+  // We'll just plot temperature over time
+  // For the chart labels, let's use the raw timestamps
+  const chartLabels = tableData.map(d => d.timestamp);
+  const tempData = tableData.map(d => d.temperature);
+
+  const chartCtx = document.getElementById('rhChart').getContext('2d');
+  const chartData = {
+    labels: chartLabels,
+    datasets: [
+      {
+        label: 'Temperature (°C)',
+        data: tempData,
+        borderColor: 'blue',
+        backgroundColor: 'blue',
+        type: 'line'
+      }
+    ]
+  };
+  const chartConfig = {
+    type: 'line', // overall type, though our dataset also specifies 'line'
+    data: chartData,
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          title: {
+            display: true,
+            text: 'Temperature (°C)'
+          }
+        }
       }
     }
-  }
-};
+  };
+  new Chart(chartCtx, chartConfig);
+}
 
-new Chart(chartCtx, chartConfig);
-
-// Simple CSV export
+// 7) EXPORT CSV
 document.getElementById('downloadCsv').addEventListener('click', () => {
-  const rows = [
-    ['Building','Zone','Temp (°C)','Humidity (%)','Risk Score','Time in High RH','Status'],
-    ['A','Room 101','19.2','81','15','8h/24h','High'],
-    ['A','Room 102','20.1','68','5','3h/24h','Medium'],
-    ['B','Library','20.0','60','2','0h/24h','Low']
-  ];
+  // Rebuild CSV from tableData
+  const rows = [['Timestamp','Temperature']];
+  tableData.forEach(item => {
+    rows.push([item.timestamp, String(item.temperature)]);
+  });
   let csvContent = '';
   rows.forEach(row => {
     csvContent += row.join(',') + '\\n';
@@ -173,24 +207,26 @@ document.getElementById('downloadCsv').addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  link.setAttribute('download', 'MouldRiskData.csv');
+  link.setAttribute('download', 'DashboardData.csv');
   link.click();
 });
 
-// Simple PDF export
+// 8) EXPORT PDF
 document.getElementById('downloadPdf').addEventListener('click', () => {
+  // Construct a pdfmake table body
+  const bodyRows = [
+    ['Timestamp','Temperature (°C)']
+  ];
+  tableData.forEach(item => {
+    bodyRows.push([ item.timestamp, item.temperature ? String(item.temperature.toFixed(1)) : 'N/A' ]);
+  });
   const docDefinition = {
     content: [
-      { text: 'Mould Risk Report', style: 'header' },
+      { text: 'Mould Risk Report (Temperature Only)', style: 'header' },
       '',
       {
         table: {
-          body: [
-            ['Building','Zone','Temp (°C)','Humidity (%)','Risk','Time in High RH','Status'],
-            ['A','Room 101','19.2','81','15','8h/24h','High'],
-            ['A','Room 102','20.1','68','5','3h/24h','Medium'],
-            ['B','Library','20.0','60','2','0h/24h','Low']
-          ]
+          body: bodyRows
         }
       }
     ],
@@ -198,7 +234,7 @@ document.getElementById('downloadPdf').addEventListener('click', () => {
       header: { fontSize: 16, bold: true }
     }
   };
-  pdfMake.createPdf(docDefinition).download('MouldRiskReport.pdf');
+  pdfMake.createPdf(docDefinition).download('DashboardReport.pdf');
 });
 </script>
 
