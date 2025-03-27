@@ -1,132 +1,205 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Google Sheets CSV Demo</title>
+  <meta charset="UTF-8" />
+  <title>Mould Risk Dashboard (Google Sheets)</title>
+  <!-- Chart.js for graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- pdfmake for PDF export -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfmake/build/pdfmake.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfmake/build/vfs_fonts.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    header { background: #f2f2f2; padding: 1rem; }
+    .cards { display: flex; gap: 1rem; margin: 1rem; }
+    .card { background: #fff; padding: 1rem; border: 1px solid #ddd; flex: 1; text-align: center; }
+    h2 { margin: 0.5rem 0; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { padding: 0.5rem; border: 1px solid #ccc; text-align: left; }
+    .btns { margin: 1rem; }
+    .btns button { margin-right: 0.5rem; padding: 0.5rem 1rem; }
+    #chartContainer { margin: 1rem; }
+  </style>
 </head>
 <body>
-<h1>Google Sheets CSV Fetch Demo</h1>
-<p>Records found: <span id="count">0</span></p>
-<table border="1" id="dataTable">
-  <thead>
-    <tr>
-      <th>Timestamp</th>
-      <th>Temp_004</th>
-      <th>RH_004</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+
+<header>
+  <h1>Mould Risk Dashboard</h1>
+</header>
+
+<!-- Top-level summary cards -->
+<div class="cards">
+  <div class="card">
+    <h2>Buildings</h2>
+    <p id="bldCount">0</p>
+  </div>
+  <div class="card">
+    <h2>Zones Monitored</h2>
+    <p id="zoneCount">0</p>
+  </div>
+  <div class="card">
+    <h2>Zones High Risk</h2>
+    <p id="highRiskCount">0</p>
+  </div>
+  <div class="card">
+    <h2>Zones Caution</h2>
+    <p id="cautionCount">0</p>
+  </div>
+  <div class="card">
+    <h2>Zones Normal</h2>
+    <p id="normalCount">0</p>
+  </div>
+</div>
+
+<!-- Data table -->
+<div style="margin: 1rem;">
+  <table>
+    <thead>
+      <tr>
+        <th>Building</th>
+        <th>Zone</th>
+        <th>Temperature (°C)</th>
+        <th>Humidity (%)</th>
+        <th>Risk Score</th>
+        <th>Time in High RH</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="zoneTableBody">
+      <!-- Populated dynamically from CSV -->
+    </tbody>
+  </table>
+</div>
+
+<!-- Chart container -->
+<div id="chartContainer">
+  <canvas id="rhChart"></canvas>
+</div>
+
+<!-- Buttons for exporting -->
+<div class="btns">
+  <button id="downloadCsv">Export CSV</button>
+  <button id="downloadPdf">Export PDF</button>
+</div>
 
 <script>
-/*
- * STEP 1: PUBLISH YOUR SHEET AS A CSV
- *   - In Google Sheets: File -> Publish to the web
- *   - Choose "Entire Document" or a specific sheet
- *   - Under 'Link', pick 'Comma-separated values (.csv)'
- *   - Copy the generated link
- *
- * STEP 2: REPLACE the CSV_URL below with your published link
-*/
-const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTtyaaD9UIdtuhO9BW1q6Mb4-26_jsidDU73HB1DE4Y8FE1tKSQxIAkLasrc3bT-0mvDy4ejjgTPJm1/pub?gid=0&single=true&output=csv';
+// YOUR provided CSV link:
+const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTtyaaD9UIdtuhO9BW1q6Mb4-26_jsidDU73HB1DE4Y8FE1tKSQxIAkLasrc3bT-0mvDy4ejjgTPJm1/pub?gid=0&single=true&output=csv';
 
-// Our code expects these column headers exactly in row 1
-const COL_TIMESTAMP = 'Timestamp';
-const COL_TEMP = 'Temp_004';
-const COL_RH = 'RH_004';
+let tableData = [];
+let chartLabels = [];
+let tempData = [];
+let rhData = [];
 
-// We’ll store each row’s data here
-const parsedData = [];
-
-fetch(CSV_URL)
-  .then(response => {
-    if (!response.ok) {
-      throw new Error('Network response was not OK: ' + response.statusText);
-    }
-    return response.text();
+// 1. Fetch CSV from Google Sheets
+fetch(GOOGLE_SHEET_CSV_URL)
+  .then(response => response.text())
+  .then(csvText => {
+    parseCsv(csvText);
+    updateDashboard();
+    buildTable();
+    buildChart();
   })
-  .then(csv => {
-    parseCsv(csv);
-    displayData();
-  })
-  .catch(err => console.error('Fetch error:', err));
+  .catch(err => console.error('Error fetching CSV:', err));
 
-function parseCsv(csvText) {
-  const lines = csvText.split('\n').map(line => line.trim()).filter(line => line);
-  if (!lines.length) {
-    console.warn('No lines in CSV');
-    return;
-  }
-
-  // First line = headers
+// 2. Parse CSV
+function parseCsv(csv) {
+  // Split by lines and remove empty lines
+  const lines = csv.split('\n').filter(line => line.trim().length > 0);
+  // First line assumed as headers
   const headers = lines[0].split(',');
-  console.log('Headers =>', headers);
-
-  const idxTimestamp = headers.indexOf(COL_TIMESTAMP);
-  const idxTemp = headers.indexOf(COL_TEMP);
-  const idxRh = headers.indexOf(COL_RH);
-
-  // If any index is -1 => mismatch
-  if (idxTimestamp === -1 || idxTemp === -1 || idxRh === -1) {
-    console.warn('Could not find the expected columns. Make sure your CSV has EXACT headers:', 
-      COL_TIMESTAMP, COL_TEMP, COL_RH
-    );
-    return;
-  }
-
-  // Process subsequent lines
+  
+  // For demonstration, we expect columns:
+  // Building,Zone,Temperature,Humidity,RiskScore,TimeHighRH,Status
   for (let i = 1; i < lines.length; i++) {
     const row = lines[i].split(',');
-    if (row.length < headers.length) continue; // skip partial lines
-
-    // Extract the data
-    const ts = row[idxTimestamp];
-    const tmpVal = row[idxTemp];
-    const rhVal = row[idxRh];
-
-    // Optional parse floats
-    const tempFloat = parseFloat(tmpVal);
-    const rhFloat = parseFloat(rhVal);
-
-    // Debug print each row
-    console.log(`Row #${i}`, { ts, tempFloat, rhFloat });
-
-    // Store in an object
-    parsedData.push({
-      timestamp: ts,
-      temperature: isNaN(tempFloat) ? null : tempFloat,
-      humidity: isNaN(rhFloat) ? null : rhFloat
-    });
+    if (row.length === headers.length) {
+      tableData.push({
+        building: row[0],
+        zone: row[1],
+        temperature: parseFloat(row[2]) || 0,
+        humidity: parseFloat(row[3]) || 0,
+        riskScore: parseInt(row[4]) || 0,
+        timeHighRH: row[5],
+        status: row[6]
+      });
+    }
   }
 }
 
-function displayData() {
-  // Show record count
-  document.getElementById('count').textContent = parsedData.length;
+// 3. Update Dashboard Counters
+function updateDashboard() {
+  const buildingSet = new Set();
+  let highCount = 0;
+  let mediumCount = 0;
+  let lowCount = 0;
 
-  const tbody = document.getElementById('dataTable').querySelector('tbody');
-  // Clear old rows if any
+  tableData.forEach(item => {
+    buildingSet.add(item.building);
+    const st = item.status.toLowerCase();
+    if (st === 'high') highCount++;
+    else if (st === 'medium') mediumCount++;
+    else lowCount++;
+  });
+
+  document.getElementById('bldCount').textContent = buildingSet.size;
+  document.getElementById('zoneCount').textContent = tableData.length;
+  document.getElementById('highRiskCount').textContent = highCount;
+  document.getElementById('cautionCount').textContent = mediumCount;
+  document.getElementById('normalCount').textContent = lowCount;
+}
+
+// 4. Build HTML Table
+function buildTable() {
+  const tbody = document.getElementById('zoneTableBody');
   tbody.innerHTML = '';
-
-  // Populate table
-  parsedData.forEach((item, idx) => {
+  tableData.forEach(item => {
     const tr = document.createElement('tr');
 
-    const tdTs = document.createElement('td');
-    tdTs.textContent = item.timestamp || '';
-    tr.appendChild(tdTs);
+    // Building
+    let td = document.createElement('td');
+    td.textContent = item.building;
+    tr.appendChild(td);
 
-    const tdTemp = document.createElement('td');
-    tdTemp.textContent = (item.temperature !== null) ? item.temperature : '';
-    tr.appendChild(tdTemp);
+    // Zone
+    td = document.createElement('td');
+    td.textContent = item.zone;
+    tr.appendChild(td);
 
-    const tdRh = document.createElement('td');
-    tdRh.textContent = (item.humidity !== null) ? item.humidity : '';
-    tr.appendChild(tdRh);
+    // Temperature
+    td = document.createElement('td');
+    td.textContent = item.temperature;
+    tr.appendChild(td);
+
+    // Humidity
+    td = document.createElement('td');
+    td.textContent = item.humidity;
+    tr.appendChild(td);
+
+    // Risk Score
+    td = document.createElement('td');
+    td.textContent = item.riskScore;
+    tr.appendChild(td);
+
+    // Time in High RH
+    td = document.createElement('td');
+    td.textContent = item.timeHighRH;
+    tr.appendChild(td);
+
+    // Status
+    td = document.createElement('td');
+    td.textContent = item.status;
+    tr.appendChild(td);
 
     tbody.appendChild(tr);
   });
 }
-</script>
-</body>
-</html>
+
+// 5. Build Chart (Temperature vs. Humidity)
+function buildChart() {
+  // For demonstration, label each row as e.g. "Data 1, Data 2..."
+  chartLabels = tableData.map((_, i) => `Data ${i+1}`);
+  tempData = tableData.map(d => d.temperature);
+  rhData = tableData.map(d => d.humidity);
+
+  const ctx = document.get
